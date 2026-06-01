@@ -33,6 +33,12 @@ Run a health check:
 uv run skillenv doctor research
 ```
 
+Compare two environments:
+
+```bash
+uv run skillenv diff research coding
+```
+
 Run Codex with the environment active:
 
 ```bash

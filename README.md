@@ -14,6 +14,7 @@ uv run skillenv create research-lab --preset research --install-plugins
 uv run skillenv env list
 uv run skillenv env info research
 uv run skillenv doctor research
+uv run skillenv diff research coding
 uv run skillenv install research /path/to/a-skill
 uv run skillenv install research pdf
 uv run skillenv install research github:openai/skills/skills/.curated/pdf
@@ -66,7 +67,7 @@ notebook skills separate from a coding environment with engineering plugins.
 ## Current Scope
 
 - Create, list, export, import, run, and remove environments.
-- Inspect and diagnose environment state with `env info` and `doctor`.
+- Inspect, diagnose, and compare environments with `env info`, `doctor`, and `diff`.
 - Install local skill directories containing `SKILL.md`.
 - Install bundled registry skills by name, such as `pdf`.
 - Install public GitHub skill directories with `github:owner/repo/path@ref`.
@@ -149,6 +150,14 @@ uv run skillenv doctor research
 
 `doctor` currently verifies core files and checks that every installed skill
 directory contains `SKILL.md`.
+
+Compare two environments:
+
+```bash
+uv run skillenv diff research coding
+```
+
+`diff` compares skills and plugins recorded in each environment lock file.
 
 ## Registry
 

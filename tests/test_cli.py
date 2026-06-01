@@ -61,6 +61,23 @@ def test_doctor_command_fails_for_missing_skill_file(tmp_path, monkeypatch):
     assert "missing SKILL.md: skills/broken" in result.stdout
 
 
+def test_diff_command_prints_environment_differences(tmp_path, monkeypatch):
+    monkeypatch.setenv("SKILLENV_HOME", str(tmp_path))
+    runner = CliRunner()
+    runner.invoke(app, ["create", "research"])
+    runner.invoke(app, ["create", "coding"])
+    runner.invoke(app, ["plugin", "install", "research", "latex@openai-bundled"])
+    runner.invoke(app, ["plugin", "install", "coding", "browser@openai-bundled"])
+
+    result = runner.invoke(app, ["diff", "research", "coding"])
+
+    assert result.exit_code == 0
+    assert "plugins only in research:" in result.stdout
+    assert "latex@openai-bundled" in result.stdout
+    assert "plugins only in coding:" in result.stdout
+    assert "browser@openai-bundled" in result.stdout
+
+
 def test_install_command_copies_local_skill(tmp_path, monkeypatch):
     monkeypatch.setenv("SKILLENV_HOME", str(tmp_path / "home"))
     skill = tmp_path / "demo-skill"

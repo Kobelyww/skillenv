@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from skillenv.envs import create_env
-from skillenv.inspect import check_env, describe_env
+from skillenv.inspect import check_env, describe_env, diff_envs
 from skillenv.lock import add_skill_record
 from skillenv.plugins import install_plugin
 
@@ -37,3 +37,21 @@ def test_check_env_reports_missing_skill_file(tmp_path: Path):
 
     assert result.ok is False
     assert "missing SKILL.md: skills/broken" in result.issues
+
+
+def test_diff_envs_reports_skill_and_plugin_differences(tmp_path: Path):
+    research = create_env("research", home=tmp_path)
+    coding = create_env("coding", home=tmp_path)
+    add_skill_record(research, name="pdf", source="pdf")
+    add_skill_record(coding, name="openai-docs", source="openai-docs")
+    install_plugin(research, "latex@openai-bundled")
+    install_plugin(coding, "browser@openai-bundled")
+
+    result = diff_envs(research, coding)
+
+    assert result.left_name == "research"
+    assert result.right_name == "coding"
+    assert result.skills_only_left == ["pdf"]
+    assert result.skills_only_right == ["openai-docs"]
+    assert result.plugins_only_left == ["latex@openai-bundled"]
+    assert result.plugins_only_right == ["browser@openai-bundled"]

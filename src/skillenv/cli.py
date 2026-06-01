@@ -4,7 +4,7 @@ import typer
 
 from skillenv import __version__
 from skillenv.envs import create_env, get_env, list_envs, remove_env
-from skillenv.inspect import check_env, describe_env
+from skillenv.inspect import check_env, describe_env, diff_envs
 from skillenv.install import install_github_skill, install_local_skill, parse_github_source
 from skillenv.manifest import export_manifest, load_manifest_file, parse_inline_list, render_manifest
 from skillenv.plugin_adapter import create_claude_code_adapter, create_codex_plugin_adapter
@@ -125,6 +125,27 @@ def doctor(env_name: str) -> None:
     for issue in result.issues:
         typer.echo(issue)
     raise typer.Exit(1)
+
+
+@app.command("diff")
+def diff_command(left_env_name: str, right_env_name: str) -> None:
+    """Compare skills and plugins recorded in two environments."""
+    left = get_env(left_env_name)
+    right = get_env(right_env_name)
+    result = diff_envs(left, right)
+    print_diff_section(f"skills only in {result.left_name}:", result.skills_only_left)
+    print_diff_section(f"skills only in {result.right_name}:", result.skills_only_right)
+    print_diff_section(f"plugins only in {result.left_name}:", result.plugins_only_left)
+    print_diff_section(f"plugins only in {result.right_name}:", result.plugins_only_right)
+
+
+def print_diff_section(title: str, items: list[str]) -> None:
+    typer.echo(title)
+    if not items:
+        typer.echo("  -")
+        return
+    for item in items:
+        typer.echo(f"  {item}")
 
 
 @app.command(
