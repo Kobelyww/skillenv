@@ -15,6 +15,12 @@ Create from a preset:
 uv run skillenv create research-lab --preset research --install-plugins
 ```
 
+Clone an existing environment:
+
+```bash
+uv run skillenv clone research research-v2
+```
+
 Install a skill:
 
 ```bash

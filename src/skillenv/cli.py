@@ -3,7 +3,7 @@ from pathlib import Path
 import typer
 
 from skillenv import __version__
-from skillenv.envs import create_env, get_env, list_envs, remove_env
+from skillenv.envs import clone_env, create_env, get_env, list_envs, remove_env
 from skillenv.inspect import check_env, describe_env, diff_envs
 from skillenv.install import install_github_skill, install_local_skill, parse_github_source
 from skillenv.manifest import export_manifest, load_manifest_file, parse_inline_list, render_manifest
@@ -75,6 +75,13 @@ def create(
             for plugin_selector in selected.plugins:
                 install_plugin(env, plugin_selector)
     typer.echo(f"created {env.name}: {env.root}")
+
+
+@app.command("clone")
+def clone_command(source_env_name: str, target_env_name: str) -> None:
+    """Clone an environment without sessions or logs."""
+    cloned = clone_env(source_env_name, target_env_name)
+    typer.echo(f"cloned {source_env_name} -> {cloned.name}: {cloned.root}")
 
 
 @app.command()

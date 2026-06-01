@@ -42,6 +42,39 @@ def create_env(name: str, home: Path | None = None) -> Env:
     return Env(name=name, root=root)
 
 
+def clone_env(source_name: str, target_name: str, home: Path | None = None) -> Env:
+    source = get_env(source_name, home)
+    target_root = env_path(target_name, home)
+    if target_root.exists():
+        raise FileExistsError(f"environment already exists: {target_name}")
+
+    target = create_env(target_name, home)
+    for dirname in ("skills", "plugins"):
+        shutil.rmtree(target.root / dirname)
+        shutil.copytree(source.root / dirname, target.root / dirname)
+
+    for filename in ("config.toml", "lock.json"):
+        source_file = source.root / filename
+        if source_file.exists():
+            shutil.copy2(source_file, target.root / filename)
+
+    source_manifest = source.root / "skillenv.yml"
+    if source_manifest.exists():
+        target_manifest = rewrite_manifest_name(source_manifest.read_text(encoding="utf-8"), target_name)
+        (target.root / "skillenv.yml").write_text(target_manifest, encoding="utf-8")
+
+    return target
+
+
+def rewrite_manifest_name(text: str, target_name: str) -> str:
+    lines = text.splitlines()
+    for index, line in enumerate(lines):
+        if line.startswith("name:"):
+            lines[index] = f"name: {target_name}"
+            return "\n".join(lines) + ("\n" if text.endswith("\n") else "")
+    return f"name: {target_name}\n{text}"
+
+
 def get_env(name: str, home: Path | None = None) -> Env:
     root = env_path(name, home)
     if not root.is_dir():

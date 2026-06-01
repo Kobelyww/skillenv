@@ -11,6 +11,7 @@ so skills, plugins, sessions, logs, and configuration can be separated by task.
 uv run skillenv create research
 uv run skillenv create research-lab --preset research
 uv run skillenv create research-lab --preset research --install-plugins
+uv run skillenv clone research research-v2
 uv run skillenv env list
 uv run skillenv env info research
 uv run skillenv doctor research
@@ -66,7 +67,7 @@ notebook skills separate from a coding environment with engineering plugins.
 
 ## Current Scope
 
-- Create, list, export, import, run, and remove environments.
+- Create, clone, list, export, import, run, and remove environments.
 - Inspect, diagnose, and compare environments with `env info`, `doctor`, and `diff`.
 - Install local skill directories containing `SKILL.md`.
 - Install bundled registry skills by name, such as `pdf`.
@@ -133,6 +134,15 @@ environment:
 uv run skillenv export research > skillenv.yml
 uv run skillenv create -f skillenv.yml
 ```
+
+Clone an environment:
+
+```bash
+uv run skillenv clone research research-v2
+```
+
+`clone` copies skills, plugins, `config.toml`, `lock.json`, and `skillenv.yml`
+while rewriting the manifest name. It does not copy `sessions/` or `log/`.
 
 ## Inspection
 

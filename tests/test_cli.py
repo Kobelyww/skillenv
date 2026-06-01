@@ -24,6 +24,22 @@ def test_create_and_env_list_commands(tmp_path, monkeypatch):
     assert "research" in list_result.stdout
 
 
+def test_clone_command_copies_environment_without_history(tmp_path, monkeypatch):
+    monkeypatch.setenv("SKILLENV_HOME", str(tmp_path))
+    runner = CliRunner()
+    runner.invoke(app, ["create", "research"])
+    runner.invoke(app, ["plugin", "install", "research", "latex@openai-bundled"])
+    (tmp_path / "envs" / "research" / "sessions" / "old.jsonl").write_text("session", encoding="utf-8")
+
+    result = runner.invoke(app, ["clone", "research", "research-copy"])
+
+    assert result.exit_code == 0
+    assert "cloned research -> research-copy" in result.stdout
+    assert (tmp_path / "envs" / "research-copy" / "config.toml").is_file()
+    assert "name: research-copy" in (tmp_path / "envs" / "research-copy" / "skillenv.yml").read_text(encoding="utf-8")
+    assert not (tmp_path / "envs" / "research-copy" / "sessions" / "old.jsonl").exists()
+
+
 def test_env_info_command_prints_summary(tmp_path, monkeypatch):
     monkeypatch.setenv("SKILLENV_HOME", str(tmp_path))
     runner = CliRunner()
