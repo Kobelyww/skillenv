@@ -155,6 +155,24 @@ def test_install_command_accepts_github_source(tmp_path, monkeypatch):
     assert "installed pdf" in result.stdout
 
 
+def test_install_command_accepts_registry_skill_name(tmp_path, monkeypatch):
+    monkeypatch.setenv("SKILLENV_HOME", str(tmp_path / "home"))
+    runner = CliRunner()
+    runner.invoke(app, ["create", "research"])
+
+    def fake_install(env, source: GitHubSkillSource, force=False):
+        destination = env.root / "skills" / source.name
+        destination.mkdir(parents=True)
+        (destination / "SKILL.md").write_text("---\nname: pdf\n---\n# PDF\n", encoding="utf-8")
+        return destination
+
+    monkeypatch.setattr(cli_module, "install_github_skill", fake_install)
+    result = runner.invoke(app, ["install", "research", "pdf"])
+
+    assert result.exit_code == 0
+    assert "installed pdf" in result.stdout
+
+
 def test_registry_list_command():
     result = CliRunner().invoke(app, ["registry", "list"])
 
@@ -168,6 +186,28 @@ def test_registry_show_command():
 
     assert result.exit_code == 0
     assert "Read, inspect" in result.stdout
+
+
+def test_registry_search_command():
+    result = CliRunner().invoke(app, ["registry", "search", "notebook"])
+
+    assert result.exit_code == 0
+    assert "jupyter-notebook" in result.stdout
+
+
+def test_registry_add_and_sources_commands(tmp_path, monkeypatch):
+    monkeypatch.setenv("SKILLENV_HOME", str(tmp_path))
+    registry_file = tmp_path / "skills.json"
+    registry_file.write_text('{"version": 1, "skills": []}', encoding="utf-8")
+    runner = CliRunner()
+
+    add_result = runner.invoke(app, ["registry", "add", "local", str(registry_file)])
+    sources_result = runner.invoke(app, ["registry", "sources"])
+
+    assert add_result.exit_code == 0
+    assert "added local" in add_result.stdout
+    assert sources_result.exit_code == 0
+    assert str(registry_file) in sources_result.stdout
 
 
 def test_adapter_codex_command_creates_plugin(tmp_path):

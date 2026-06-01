@@ -12,11 +12,15 @@ uv run skillenv create research
 uv run skillenv create research-lab --preset research
 uv run skillenv env list
 uv run skillenv install research /path/to/a-skill
+uv run skillenv install research pdf
 uv run skillenv install research github:openai/skills/skills/.curated/pdf
 uv run skillenv run research -- codex
 uv run skillenv export research > skillenv.yml
 uv run skillenv create -f skillenv.yml
 uv run skillenv registry list
+uv run skillenv registry search notebook
+uv run skillenv registry add team ./registry/skills.json
+uv run skillenv registry update
 uv run skillenv adapter codex --out plugins
 uv run skillenv remove research
 ```
@@ -57,10 +61,11 @@ notebook skills separate from a coding environment with engineering plugins.
 
 - Create, list, export, import, run, and remove environments.
 - Install local skill directories containing `SKILL.md`.
+- Install bundled registry skills by name, such as `pdf`.
 - Install public GitHub skill directories with `github:owner/repo/path@ref`.
 - Track installed skills in `lock.json`.
 - Create environments from built-in presets: `clean`, `coding`, and `research`.
-- Inspect the bundled seed registry.
+- Inspect bundled, local, and remote registries.
 - Generate a Codex plugin adapter scaffold.
 - Run any command with `CODEX_HOME` pointed at a selected environment.
 
@@ -107,10 +112,30 @@ The packaged CLI reads the bundled copy and exposes:
 ```bash
 uv run skillenv registry list
 uv run skillenv registry show pdf
+uv run skillenv registry search notebook
+uv run skillenv registry add team ./registry/skills.json
+uv run skillenv registry sources
+uv run skillenv registry update
 ```
 
-The registry is intentionally small in the first release. It is metadata, not a
-full dependency resolver.
+Registry sources may be local JSON files or HTTP(S) URLs with this shape:
+
+```json
+{
+  "version": 1,
+  "skills": [
+    {
+      "name": "pdf",
+      "source": "github:openai/skills/skills/.curated/pdf",
+      "description": "Read, inspect, and create PDF documents."
+    }
+  ]
+}
+```
+
+The bundled registry is always available. Added registries are cached under
+`~/.skillenv/registry-cache` after `skillenv registry update`. The registry is
+metadata, not a full dependency resolver.
 
 ## Codex Adapter
 

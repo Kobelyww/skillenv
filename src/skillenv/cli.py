@@ -8,7 +8,14 @@ from skillenv.install import install_github_skill, install_local_skill, parse_gi
 from skillenv.manifest import export_manifest, load_manifest_file, parse_inline_list, render_manifest
 from skillenv.plugin_adapter import create_codex_plugin_adapter
 from skillenv.presets import get_preset, list_presets
-from skillenv.registry import get_registry_skill, list_registry_skills
+from skillenv.registry import (
+    add_registry_source,
+    get_registry_skill,
+    list_registry_skills,
+    list_registry_sources,
+    search_registry_skills,
+    update_registry_cache,
+)
 from skillenv.runner import run_command
 
 app = typer.Typer(help="Manage isolated agent skill environments.", no_args_is_help=True)
@@ -73,7 +80,14 @@ def install_skill_source(env, source: str, force: bool = False) -> Path:
         return install_github_skill(env, parse_github_source(source), force=force)
     if source.startswith("local:"):
         return install_local_skill(env, Path(source.removeprefix("local:")), force=force)
-    return install_local_skill(env, Path(source), force=force)
+    path = Path(source)
+    if path.exists():
+        return install_local_skill(env, path, force=force)
+    try:
+        registry_skill = get_registry_skill(source)
+    except KeyError:
+        return install_local_skill(env, path, force=force)
+    return install_skill_source(env, registry_skill.source, force=force)
 
 
 @app.command("export")
@@ -137,6 +151,38 @@ def registry_show_command(name: str) -> None:
     typer.echo(f"name: {skill.name}")
     typer.echo(f"source: {skill.source}")
     typer.echo(f"description: {skill.description}")
+
+
+@registry_app.command("search")
+def registry_search_command(query: str) -> None:
+    """Search bundled and cached registry skills."""
+    for skill in search_registry_skills(query):
+        typer.echo(f"{skill.name}\t{skill.source}\t{skill.description}")
+
+
+@registry_app.command("add")
+def registry_add_command(name: str, url: str) -> None:
+    """Add a local or remote registry source."""
+    add_registry_source(name, url)
+    typer.echo(f"added {name}: {url}")
+
+
+@registry_app.command("sources")
+def registry_sources_command() -> None:
+    """List configured registry sources."""
+    sources = list_registry_sources()
+    if not sources:
+        typer.echo("no registry sources")
+        return
+    for source in sources:
+        typer.echo(f"{source['name']}\t{source['url']}")
+
+
+@registry_app.command("update")
+def registry_update_command() -> None:
+    """Refresh configured registry caches."""
+    update_registry_cache()
+    typer.echo("updated registry cache")
 
 
 @adapter_app.command("codex")
