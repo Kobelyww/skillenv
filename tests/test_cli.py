@@ -24,6 +24,43 @@ def test_create_and_env_list_commands(tmp_path, monkeypatch):
     assert "research" in list_result.stdout
 
 
+def test_env_info_command_prints_summary(tmp_path, monkeypatch):
+    monkeypatch.setenv("SKILLENV_HOME", str(tmp_path))
+    runner = CliRunner()
+    runner.invoke(app, ["create", "research"])
+    runner.invoke(app, ["plugin", "install", "research", "latex@openai-bundled"])
+
+    result = runner.invoke(app, ["env", "info", "research"])
+
+    assert result.exit_code == 0
+    assert "name: research" in result.stdout
+    assert "plugins: latex@openai-bundled" in result.stdout
+
+
+def test_doctor_command_reports_ok_for_healthy_env(tmp_path, monkeypatch):
+    monkeypatch.setenv("SKILLENV_HOME", str(tmp_path))
+    runner = CliRunner()
+    runner.invoke(app, ["create", "research"])
+
+    result = runner.invoke(app, ["doctor", "research"])
+
+    assert result.exit_code == 0
+    assert "OK research" in result.stdout
+
+
+def test_doctor_command_fails_for_missing_skill_file(tmp_path, monkeypatch):
+    monkeypatch.setenv("SKILLENV_HOME", str(tmp_path))
+    runner = CliRunner()
+    runner.invoke(app, ["create", "research"])
+    broken_skill = tmp_path / "envs" / "research" / "skills" / "broken"
+    broken_skill.mkdir()
+
+    result = runner.invoke(app, ["doctor", "research"])
+
+    assert result.exit_code == 1
+    assert "missing SKILL.md: skills/broken" in result.stdout
+
+
 def test_install_command_copies_local_skill(tmp_path, monkeypatch):
     monkeypatch.setenv("SKILLENV_HOME", str(tmp_path / "home"))
     skill = tmp_path / "demo-skill"

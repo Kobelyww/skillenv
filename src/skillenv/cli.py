@@ -4,6 +4,7 @@ import typer
 
 from skillenv import __version__
 from skillenv.envs import create_env, get_env, list_envs, remove_env
+from skillenv.inspect import check_env, describe_env
 from skillenv.install import install_github_skill, install_local_skill, parse_github_source
 from skillenv.manifest import export_manifest, load_manifest_file, parse_inline_list, render_manifest
 from skillenv.plugin_adapter import create_claude_code_adapter, create_codex_plugin_adapter
@@ -113,6 +114,19 @@ def remove(env_name: str) -> None:
     typer.echo(f"removed {env_name}")
 
 
+@app.command()
+def doctor(env_name: str) -> None:
+    """Check an environment for common configuration problems."""
+    env = get_env(env_name)
+    result = check_env(env)
+    if result.ok:
+        typer.echo(f"OK {env.name}")
+        return
+    for issue in result.issues:
+        typer.echo(issue)
+    raise typer.Exit(1)
+
+
 @app.command(
     context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
 )
@@ -136,6 +150,17 @@ def list_command() -> None:
         return
     for env in envs:
         typer.echo(f"{env.name}\t{env.root}")
+
+
+@env_app.command("info")
+def env_info_command(env_name: str) -> None:
+    """Print a summary of one environment."""
+    env = get_env(env_name)
+    summary = describe_env(env)
+    typer.echo(f"name: {summary['name']}")
+    typer.echo(f"root: {summary['root']}")
+    typer.echo(f"skills: {', '.join(summary['skills']) if summary['skills'] else '-'}")
+    typer.echo(f"plugins: {', '.join(summary['plugins']) if summary['plugins'] else '-'}")
 
 
 @preset_app.command("list")

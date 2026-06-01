@@ -12,6 +12,8 @@ uv run skillenv create research
 uv run skillenv create research-lab --preset research
 uv run skillenv create research-lab --preset research --install-plugins
 uv run skillenv env list
+uv run skillenv env info research
+uv run skillenv doctor research
 uv run skillenv install research /path/to/a-skill
 uv run skillenv install research pdf
 uv run skillenv install research github:openai/skills/skills/.curated/pdf
@@ -64,6 +66,7 @@ notebook skills separate from a coding environment with engineering plugins.
 ## Current Scope
 
 - Create, list, export, import, run, and remove environments.
+- Inspect and diagnose environment state with `env info` and `doctor`.
 - Install local skill directories containing `SKILL.md`.
 - Install bundled registry skills by name, such as `pdf`.
 - Install public GitHub skill directories with `github:owner/repo/path@ref`.
@@ -74,8 +77,8 @@ notebook skills separate from a coding environment with engineering plugins.
 - Generate Codex and Claude Code adapter scaffolds.
 - Run any command with `CODEX_HOME` pointed at a selected environment.
 
-Dependency solving, semantic version constraints, remote registries, and Claude
-Code adapters are intentionally left for later releases.
+Dependency solving and semantic version constraints are intentionally left for
+later releases.
 
 ## Presets
 
@@ -129,6 +132,23 @@ environment:
 uv run skillenv export research > skillenv.yml
 uv run skillenv create -f skillenv.yml
 ```
+
+## Inspection
+
+Summarize an environment:
+
+```bash
+uv run skillenv env info research
+```
+
+Check an environment for common problems:
+
+```bash
+uv run skillenv doctor research
+```
+
+`doctor` currently verifies core files and checks that every installed skill
+directory contains `SKILL.md`.
 
 ## Registry
 

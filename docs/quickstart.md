@@ -21,6 +21,18 @@ Install a skill:
 uv run skillenv install research pdf
 ```
 
+Inspect the environment:
+
+```bash
+uv run skillenv env info research
+```
+
+Run a health check:
+
+```bash
+uv run skillenv doctor research
+```
+
 Run Codex with the environment active:
 
 ```bash
