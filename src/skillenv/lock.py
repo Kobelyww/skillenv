@@ -33,3 +33,11 @@ def add_skill_record(env: Env, name: str, source: str) -> None:
     skills.append({"name": name, "source": source})
     data["skills"] = sorted(skills, key=lambda skill: skill["name"])
     write_lock(env, data)
+
+
+def add_plugin_record(env: Env, name: str, source: str) -> None:
+    data = read_lock(env)
+    plugins = [plugin for plugin in data["plugins"] if plugin["name"] != name]
+    plugins.append({"name": name, "source": source})
+    data["plugins"] = sorted(plugins, key=lambda plugin: plugin["name"])
+    write_lock(env, data)

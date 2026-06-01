@@ -117,6 +117,21 @@ def test_create_from_manifest_installs_local_skill(tmp_path, monkeypatch):
     assert (tmp_path / "home" / "envs" / "writing" / "skills" / "demo-skill" / "SKILL.md").is_file()
 
 
+def test_create_from_manifest_installs_plugin_selector(tmp_path, monkeypatch):
+    monkeypatch.setenv("SKILLENV_HOME", str(tmp_path / "home"))
+    manifest = tmp_path / "skillenv.yml"
+    manifest.write_text(
+        "name: writing\nadapter: codex\nskills: []\nplugins: [latex@openai-bundled]\n",
+        encoding="utf-8",
+    )
+
+    result = CliRunner().invoke(app, ["create", "-f", str(manifest)])
+
+    config = tmp_path / "home" / "envs" / "writing" / "config.toml"
+    assert result.exit_code == 0
+    assert '[plugins."latex@openai-bundled"]' in config.read_text(encoding="utf-8")
+
+
 def test_preset_list_command():
     result = CliRunner().invoke(app, ["preset", "list"])
 
@@ -135,6 +150,18 @@ def test_create_with_preset_writes_manifest(tmp_path, monkeypatch):
     assert result.exit_code == 0
     assert "created research-lab" in result.stdout
     assert "pdf" in manifest.read_text(encoding="utf-8")
+
+
+def test_create_with_preset_can_install_plugin_selectors(tmp_path, monkeypatch):
+    monkeypatch.setenv("SKILLENV_HOME", str(tmp_path))
+    runner = CliRunner()
+
+    result = runner.invoke(app, ["create", "research-lab", "--preset", "research", "--install-plugins"])
+
+    config = tmp_path / "envs" / "research-lab" / "config.toml"
+    assert result.exit_code == 0
+    assert '[plugins."latex@openai-bundled"]' in config.read_text(encoding="utf-8")
+    assert '[plugins."zotero@openai-curated"]' in config.read_text(encoding="utf-8")
 
 
 def test_install_command_accepts_github_source(tmp_path, monkeypatch):
@@ -216,3 +243,29 @@ def test_adapter_codex_command_creates_plugin(tmp_path):
     assert result.exit_code == 0
     assert "skillenv-codex" in result.stdout
     assert (tmp_path / "skillenv-codex" / ".codex-plugin" / "plugin.json").is_file()
+
+
+def test_plugin_install_and_list_commands(tmp_path, monkeypatch):
+    monkeypatch.setenv("SKILLENV_HOME", str(tmp_path))
+    runner = CliRunner()
+    runner.invoke(app, ["create", "research"])
+
+    install_result = runner.invoke(app, ["plugin", "install", "research", "latex@openai-bundled"])
+    list_result = runner.invoke(app, ["plugin", "list", "research"])
+
+    assert install_result.exit_code == 0
+    assert "installed latex@openai-bundled" in install_result.stdout
+    assert list_result.exit_code == 0
+    assert "latex@openai-bundled" in list_result.stdout
+
+
+def test_export_includes_installed_plugin(tmp_path, monkeypatch):
+    monkeypatch.setenv("SKILLENV_HOME", str(tmp_path))
+    runner = CliRunner()
+    runner.invoke(app, ["create", "research"])
+    runner.invoke(app, ["plugin", "install", "research", "latex@openai-bundled"])
+
+    result = runner.invoke(app, ["export", "research"])
+
+    assert result.exit_code == 0
+    assert "plugins: [latex@openai-bundled]" in result.stdout

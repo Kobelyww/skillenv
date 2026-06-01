@@ -10,10 +10,13 @@ so skills, plugins, sessions, logs, and configuration can be separated by task.
 ```bash
 uv run skillenv create research
 uv run skillenv create research-lab --preset research
+uv run skillenv create research-lab --preset research --install-plugins
 uv run skillenv env list
 uv run skillenv install research /path/to/a-skill
 uv run skillenv install research pdf
 uv run skillenv install research github:openai/skills/skills/.curated/pdf
+uv run skillenv plugin install research latex@openai-bundled
+uv run skillenv plugin list research
 uv run skillenv run research -- codex
 uv run skillenv export research > skillenv.yml
 uv run skillenv create -f skillenv.yml
@@ -65,6 +68,7 @@ notebook skills separate from a coding environment with engineering plugins.
 - Install public GitHub skill directories with `github:owner/repo/path@ref`.
 - Track installed skills in `lock.json`.
 - Create environments from built-in presets: `clean`, `coding`, and `research`.
+- Record plugin selectors in environment `config.toml` and `lock.json`.
 - Inspect bundled, local, and remote registries.
 - Generate a Codex plugin adapter scaffold.
 - Run any command with `CODEX_HOME` pointed at a selected environment.
@@ -87,6 +91,32 @@ Built-in presets:
 
 Presets write the intended skill/plugin sources into `skillenv.yml`; they do not
 automatically install marketplace plugins yet.
+
+To write preset plugin selectors into the environment `config.toml`, use:
+
+```bash
+uv run skillenv create research-lab --preset research --install-plugins
+```
+
+## Plugins
+
+`skillenv` records plugin selectors in an environment's `config.toml`:
+
+```bash
+uv run skillenv plugin install research latex@openai-bundled
+uv run skillenv plugin list research
+```
+
+This writes:
+
+```toml
+[plugins."latex@openai-bundled"]
+enabled = true
+```
+
+The command does not download plugin cache artifacts itself. It prepares the
+isolated Codex home so Codex can load enabled plugin selectors in that
+environment.
 
 ## Reproducibility
 

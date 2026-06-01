@@ -7,6 +7,7 @@ from skillenv.envs import create_env, get_env, list_envs, remove_env
 from skillenv.install import install_github_skill, install_local_skill, parse_github_source
 from skillenv.manifest import export_manifest, load_manifest_file, parse_inline_list, render_manifest
 from skillenv.plugin_adapter import create_codex_plugin_adapter
+from skillenv.plugins import install_plugin, list_plugins
 from skillenv.presets import get_preset, list_presets
 from skillenv.registry import (
     add_registry_source,
@@ -23,10 +24,12 @@ env_app = typer.Typer(help="Inspect and manage environments.", no_args_is_help=T
 preset_app = typer.Typer(help="Inspect built-in environment presets.", no_args_is_help=True)
 registry_app = typer.Typer(help="Inspect the bundled skill registry.", no_args_is_help=True)
 adapter_app = typer.Typer(help="Generate agent adapter artifacts.", no_args_is_help=True)
+plugin_app = typer.Typer(help="Manage environment plugin selectors.", no_args_is_help=True)
 app.add_typer(env_app, name="env")
 app.add_typer(preset_app, name="preset")
 app.add_typer(registry_app, name="registry")
 app.add_typer(adapter_app, name="adapter")
+app.add_typer(plugin_app, name="plugin")
 
 
 @app.callback()
@@ -45,6 +48,7 @@ def create(
     name: str | None = typer.Argument(None),
     file: Path | None = typer.Option(None, "--file", "-f", help="Create from a skillenv.yml manifest."),
     preset: str | None = typer.Option(None, "--preset", help="Initialize manifest from a built-in preset."),
+    install_plugins: bool = typer.Option(False, "--install-plugins", help="Install plugin selectors from the selected preset."),
 ) -> None:
     """Create an isolated Codex skill environment."""
     if file is not None:
@@ -53,6 +57,8 @@ def create(
         (env.root / "skillenv.yml").write_text(manifest_text, encoding="utf-8")
         for skill_source in parse_inline_list(manifest_text, "skills"):
             install_skill_source(env, skill_source, force=True)
+        for plugin_selector in parse_inline_list(manifest_text, "plugins"):
+            install_plugin(env, plugin_selector)
         typer.echo(f"created {env.name}: {env.root}")
         return
     if name is None:
@@ -64,6 +70,9 @@ def create(
             render_manifest(env.name, skills=selected.skills, plugins=selected.plugins),
             encoding="utf-8",
         )
+        if install_plugins:
+            for plugin_selector in selected.plugins:
+                install_plugin(env, plugin_selector)
     typer.echo(f"created {env.name}: {env.root}")
 
 
@@ -190,6 +199,26 @@ def adapter_codex_command(out: Path = typer.Option(Path("plugins"), "--out", hel
     """Create a Codex plugin adapter for skillenv."""
     plugin_root = create_codex_plugin_adapter(out)
     typer.echo(f"created skillenv-codex: {plugin_root}")
+
+
+@plugin_app.command("install")
+def plugin_install_command(env_name: str, selector: str) -> None:
+    """Record a plugin selector in an environment config."""
+    env = get_env(env_name)
+    installed = install_plugin(env, selector)
+    typer.echo(f"installed {installed}")
+
+
+@plugin_app.command("list")
+def plugin_list_command(env_name: str) -> None:
+    """List plugin selectors recorded in an environment."""
+    env = get_env(env_name)
+    plugins = list_plugins(env)
+    if not plugins:
+        typer.echo("no plugins")
+        return
+    for plugin in plugins:
+        typer.echo(plugin)
 
 
 if __name__ == "__main__":
