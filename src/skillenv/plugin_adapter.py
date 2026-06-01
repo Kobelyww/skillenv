@@ -62,3 +62,39 @@ PYTHONPATH=src python -m skillenv --help
         encoding="utf-8",
     )
     return plugin_root
+
+
+def create_claude_code_adapter(parent: Path) -> Path:
+    adapter_root = parent / "skillenv-claude-code"
+    skill_dir = adapter_root / ".claude" / "skills" / "skillenv"
+    skill_dir.mkdir(parents=True, exist_ok=True)
+
+    (skill_dir / "SKILL.md").write_text(
+        """---
+name: skillenv
+description: Use when the user wants to manage isolated agent skill environments with skillenv from Claude Code, including creating presets, installing skills, running commands with CODEX_HOME isolation, or exporting lock-backed manifests.
+---
+
+# skillenv for Claude Code
+
+Use the local `skillenv` CLI to manage isolated skill environments from Claude Code.
+
+Common commands:
+
+```bash
+skillenv create research --preset research
+skillenv install research github:openai/skills/skills/.curated/pdf
+skillenv plugin install research latex@openai-bundled
+skillenv run research -- codex
+skillenv export research
+```
+
+If the editable console script cannot import the package during development, use:
+
+```bash
+PYTHONPATH=src python -m skillenv --help
+```
+""",
+        encoding="utf-8",
+    )
+    return adapter_root

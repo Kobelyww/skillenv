@@ -6,7 +6,7 @@ from skillenv import __version__
 from skillenv.envs import create_env, get_env, list_envs, remove_env
 from skillenv.install import install_github_skill, install_local_skill, parse_github_source
 from skillenv.manifest import export_manifest, load_manifest_file, parse_inline_list, render_manifest
-from skillenv.plugin_adapter import create_codex_plugin_adapter
+from skillenv.plugin_adapter import create_claude_code_adapter, create_codex_plugin_adapter
 from skillenv.plugins import install_plugin, list_plugins
 from skillenv.presets import get_preset, list_presets
 from skillenv.registry import (
@@ -199,6 +199,13 @@ def adapter_codex_command(out: Path = typer.Option(Path("plugins"), "--out", hel
     """Create a Codex plugin adapter for skillenv."""
     plugin_root = create_codex_plugin_adapter(out)
     typer.echo(f"created skillenv-codex: {plugin_root}")
+
+
+@adapter_app.command("claude-code")
+def adapter_claude_code_command(out: Path = typer.Option(Path("adapters"), "--out", help="Parent directory for the Claude Code adapter.")) -> None:
+    """Create a Claude Code skill adapter for skillenv."""
+    adapter_root = create_claude_code_adapter(out)
+    typer.echo(f"created skillenv-claude-code: {adapter_root}")
 
 
 @plugin_app.command("install")

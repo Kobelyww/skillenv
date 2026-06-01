@@ -25,6 +25,7 @@ uv run skillenv registry search notebook
 uv run skillenv registry add team ./registry/skills.json
 uv run skillenv registry update
 uv run skillenv adapter codex --out plugins
+uv run skillenv adapter claude-code --out adapters
 uv run skillenv remove research
 ```
 
@@ -70,7 +71,7 @@ notebook skills separate from a coding environment with engineering plugins.
 - Create environments from built-in presets: `clean`, `coding`, and `research`.
 - Record plugin selectors in environment `config.toml` and `lock.json`.
 - Inspect bundled, local, and remote registries.
-- Generate a Codex plugin adapter scaffold.
+- Generate Codex and Claude Code adapter scaffolds.
 - Run any command with `CODEX_HOME` pointed at a selected environment.
 
 Dependency solving, semantic version constraints, remote registries, and Claude
@@ -185,6 +186,35 @@ plugins/skillenv-codex/
 
 The adapter is intentionally thin. Core behavior stays in the standalone
 `skillenv` CLI.
+
+## Claude Code Adapter
+
+Generate a Claude Code skill adapter scaffold:
+
+```bash
+uv run skillenv adapter claude-code --out adapters
+```
+
+This creates:
+
+```text
+adapters/skillenv-claude-code/
+  .claude/skills/skillenv/SKILL.md
+```
+
+Copy or move the generated `.claude/skills/skillenv` directory into a Claude
+Code project, or into your user-level Claude Code skills directory, depending
+on how you want to load the adapter.
+
+## Documentation
+
+Project documentation lives in `docs/`:
+
+- `docs/quickstart.md`: first environment setup.
+- `docs/adapters.md`: Codex and Claude Code adapter notes.
+- `docs/publishing.md`: release and distribution checklist.
+- `docs/manifest-spec.md`: `skillenv.yml` format.
+- `docs/lockfile-spec.md`: `lock.json` format.
 
 ## Open Source Project Files
 

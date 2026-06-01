@@ -245,6 +245,14 @@ def test_adapter_codex_command_creates_plugin(tmp_path):
     assert (tmp_path / "skillenv-codex" / ".codex-plugin" / "plugin.json").is_file()
 
 
+def test_adapter_claude_code_command_creates_skill(tmp_path):
+    result = CliRunner().invoke(app, ["adapter", "claude-code", "--out", str(tmp_path)])
+
+    assert result.exit_code == 0
+    assert "skillenv-claude-code" in result.stdout
+    assert (tmp_path / "skillenv-claude-code" / ".claude" / "skills" / "skillenv" / "SKILL.md").is_file()
+
+
 def test_plugin_install_and_list_commands(tmp_path, monkeypatch):
     monkeypatch.setenv("SKILLENV_HOME", str(tmp_path))
     runner = CliRunner()
