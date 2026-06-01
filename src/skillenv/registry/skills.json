@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "skills": [
+    {
+      "name": "pdf",
+      "source": "github:openai/skills/skills/.curated/pdf",
+      "description": "Read, inspect, and create PDF documents."
+    },
+    {
+      "name": "jupyter-notebook",
+      "source": "github:openai/skills/skills/.curated/jupyter-notebook",
+      "description": "Create and edit reproducible Jupyter notebooks."
+    },
+    {
+      "name": "transcribe",
+      "source": "github:openai/skills/skills/.curated/transcribe",
+      "description": "Transcribe audio and video recordings."
+    },
+    {
+      "name": "notion-research-documentation",
+      "source": "github:openai/skills/skills/.curated/notion-research-documentation",
+      "description": "Synthesize Notion research into structured reports."
+    }
+  ]
+}
