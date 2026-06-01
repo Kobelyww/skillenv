@@ -2,6 +2,7 @@ from pathlib import Path
 
 from skillenv.envs import create_env
 from skillenv.inspect import check_env, describe_env, diff_envs
+from skillenv.install import install_local_skill
 from skillenv.lock import add_skill_record
 from skillenv.plugins import install_plugin
 
@@ -37,6 +38,21 @@ def test_check_env_reports_missing_skill_file(tmp_path: Path):
 
     assert result.ok is False
     assert "missing SKILL.md: skills/broken" in result.issues
+
+
+def test_check_env_reports_checksum_mismatch(tmp_path: Path):
+    skill = tmp_path / "demo-skill"
+    skill.mkdir()
+    (skill / "SKILL.md").write_text("# Demo\n", encoding="utf-8")
+    env = create_env("research", home=tmp_path)
+
+    installed = install_local_skill(env, skill)
+    (installed / "SKILL.md").write_text("# Changed\n", encoding="utf-8")
+
+    result = check_env(env)
+
+    assert result.ok is False
+    assert "checksum mismatch: skills/demo-skill" in result.issues
 
 
 def test_diff_envs_reports_skill_and_plugin_differences(tmp_path: Path):

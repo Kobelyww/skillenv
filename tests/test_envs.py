@@ -36,12 +36,11 @@ def test_install_local_skill_copies_skill_directory(tmp_path: Path):
 
     assert installed == env.root / "skills" / "source-skill"
     assert (installed / "SKILL.md").read_text(encoding="utf-8") == "---\nname: demo\n---\n# Demo\n"
-    assert read_lock(env)["skills"] == [
-        {
-            "name": "source-skill",
-            "source": f"local:{source.resolve()}",
-        }
-    ]
+    record = read_lock(env)["skills"][0]
+    assert record["name"] == "source-skill"
+    assert record["source"] == f"local:{source.resolve()}"
+    assert record["installed_at"].endswith("Z")
+    assert record["checksum"].startswith("sha256:")
 
 
 def test_remove_env_deletes_environment(tmp_path: Path):

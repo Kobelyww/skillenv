@@ -31,9 +31,8 @@ def test_install_github_skill_uses_downloader(tmp_path: Path):
 
     assert installed == env.root / "skills" / "pdf"
     assert (installed / "SKILL.md").is_file()
-    assert read_lock(env)["skills"] == [
-        {
-            "name": "pdf",
-            "source": "github:openai/skills/skills/.curated/pdf@main",
-        }
-    ]
+    record = read_lock(env)["skills"][0]
+    assert record["name"] == "pdf"
+    assert record["source"] == "github:openai/skills/skills/.curated/pdf@main"
+    assert record["installed_at"].endswith("Z")
+    assert record["checksum"].startswith("sha256:")

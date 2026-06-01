@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
 from skillenv.envs import Env
-from skillenv.lock import read_lock
+from skillenv.lock import directory_checksum, read_lock
 from skillenv.plugins import list_plugins
 
 
@@ -33,6 +33,7 @@ def describe_env(env: Env) -> dict:
 
 def check_env(env: Env) -> DoctorResult:
     issues: list[str] = []
+    lock = read_lock(env)
     for required_file in ("config.toml", "skillenv.yml"):
         if not (env.root / required_file).exists():
             issues.append(f"missing {required_file}")
@@ -44,6 +45,13 @@ def check_env(env: Env) -> DoctorResult:
         for skill_dir in sorted(path for path in skills_dir.iterdir() if path.is_dir()):
             if not (skill_dir / "SKILL.md").is_file():
                 issues.append(f"missing SKILL.md: skills/{skill_dir.name}")
+    for skill in lock["skills"]:
+        checksum = skill.get("checksum")
+        if not checksum:
+            continue
+        skill_dir = env.root / "skills" / skill["name"]
+        if skill_dir.is_dir() and directory_checksum(skill_dir) != checksum:
+            issues.append(f"checksum mismatch: skills/{skill['name']}")
 
     return DoctorResult(ok=not issues, issues=issues)
 

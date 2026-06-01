@@ -10,12 +10,10 @@ def test_install_plugin_records_lock_and_config(tmp_path: Path):
 
     install_plugin(env, "latex@openai-bundled")
 
-    assert read_lock(env)["plugins"] == [
-        {
-            "name": "latex@openai-bundled",
-            "source": "latex@openai-bundled",
-        }
-    ]
+    record = read_lock(env)["plugins"][0]
+    assert record["name"] == "latex@openai-bundled"
+    assert record["source"] == "latex@openai-bundled"
+    assert record["installed_at"].endswith("Z")
     assert '[plugins."latex@openai-bundled"]' in (env.root / "config.toml").read_text(encoding="utf-8")
     assert "enabled = true" in (env.root / "config.toml").read_text(encoding="utf-8")
 
