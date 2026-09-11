@@ -1,0 +1,23 @@
+{
+  "version": 2,
+  "skills": [
+    {
+      "name": "team-lint",
+      "description": "Team lint rules",
+      "versions": {
+        "0.1.0": {
+          "source": "local:/team/lint"
+        }
+      }
+    },
+    {
+      "name": "pdf",
+      "description": "Overridden PDF",
+      "versions": {
+        "9.9.9": {
+          "source": "local:/team/pdf"
+        }
+      }
+    }
+  ]
+}

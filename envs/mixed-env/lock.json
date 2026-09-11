@@ -1,0 +1,18 @@
+{
+  "version": 2,
+  "skills": [
+    {
+      "name": "direct-dx9x9W",
+      "source": "local:/var/folders/v5/hp35skz527l1zwkv7qxggr280000gn/T/direct-dx9x9W",
+      "installed_at": "2026-09-11T16:50:21Z",
+      "checksum": "sha256:d51eb12c78bf239f35b99ebf5e3393650261cfbba9ba6da55351a0533a277759"
+    },
+    {
+      "name": "direct-uGdi4n",
+      "source": "local:/var/folders/v5/hp35skz527l1zwkv7qxggr280000gn/T/direct-uGdi4n",
+      "installed_at": "2026-09-11T16:50:44Z",
+      "checksum": "sha256:d51eb12c78bf239f35b99ebf5e3393650261cfbba9ba6da55351a0533a277759"
+    }
+  ],
+  "plugins": []
+}
