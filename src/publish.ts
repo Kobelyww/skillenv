@@ -46,6 +46,9 @@ export function publishSkill(skillDir: string, options: PublishOptions = {}): Pu
   const name = typeof meta.name === "string" ? meta.name.trim() : "";
   const description = typeof meta.description === "string" ? meta.description.trim() : "";
   const version = typeof meta.version === "string" ? meta.version.trim() : "";
+  const frontmatterDependencies = Array.isArray(meta.dependencies)
+    ? meta.dependencies.filter((dep): dep is string => typeof dep === "string" && dep.trim().length > 0)
+    : [];
   const warnings: string[] = [];
 
   if (name.length === 0) throw new Error("frontmatter is missing 'name'");
@@ -64,9 +67,14 @@ export function publishSkill(skillDir: string, options: PublishOptions = {}): Pu
   }
 
   const source = options.source ?? `local:${dir}`;
-  const dependencies = (options.dependencies ?? [])
+  // SKILL.md frontmatter dependencies are the default; --depends adds more.
+  const dependencies = [
+    ...frontmatterDependencies,
+    ...(options.dependencies ?? []),
+  ]
     .map((dep) => dep.trim())
-    .filter((dep) => dep.length > 0);
+    .filter((dep) => dep.length > 0)
+    .filter((dep, index, all) => all.indexOf(dep) === index);
 
   const entry: PublishEntry = { name, description, versions: { [version]: { source } } };
   if (dependencies.length > 0) {
