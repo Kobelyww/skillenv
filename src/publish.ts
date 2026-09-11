@@ -89,7 +89,7 @@ export function publishSkill(skillDir: string, options: PublishOptions = {}): Pu
 
 function upsertIntoRegistry(registryFile: string, entry: PublishEntry): void {
   const file = path.resolve(registryFile.replace(/^~(?=\/|$)/, process.env.HOME ?? ""));
-  let payload: { version: 1 | 2; skills: PublishEntry[] } = { version: 2, skills: [] };
+  const payload: { version: 1 | 2; skills: PublishEntry[] } = { version: 2, skills: [] };
   if (existsSync(file)) {
     const parsed = JSON.parse(readFileSync(file, "utf8")) as Partial<typeof payload>;
     if (Array.isArray(parsed.skills)) {

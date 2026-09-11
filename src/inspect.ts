@@ -87,7 +87,7 @@ export function providerReadiness(): ProviderReadiness[] {
   });
 }
 
-export function checkEnv(envRoot: string, name: string): DoctorResult {
+export function checkEnv(envRoot: string, _name: string): DoctorResult {
   const issues: string[] = [];
   const adapterId = readManifestAdapter(envRoot);
 

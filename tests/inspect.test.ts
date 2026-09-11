@@ -4,7 +4,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { checkEnv, describeEnv, diffEnvs } from "../src/inspect.js";
 import { createEnv } from "../src/env.js";
-import { addSkillRecord, readLock } from "../src/lock.js";
+import { addSkillRecord } from "../src/lock.js";
 import { installPlugin } from "../src/plugins.js";
 
 const HOME = mkdtempSync(path.join(tmpdir(), "inspect-"));

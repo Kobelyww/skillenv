@@ -93,7 +93,7 @@ export function readLock(envRoot: string): LockFile {
       return lock;
     }
     if (error instanceof SyntaxError) {
-      throw new Error(`lock file is not valid JSON: ${file}`);
+      throw new Error(`lock file is not valid JSON: ${file}`, { cause: error });
     }
     throw error;
   }
@@ -110,7 +110,7 @@ export function writeLock(envRoot: string, lock: LockFile): void {
 }
 
 function writeFileSyncIfChanged(file: string, content: string): void {
-  let current: string | null = null;
+  let current: string | null;
   try {
     current = readFileSync(file, "utf8");
   } catch {

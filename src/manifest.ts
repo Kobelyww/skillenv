@@ -32,7 +32,7 @@ export function parseManifest(text: string): Manifest {
   try {
     data = parse(text);
   } catch (error) {
-    throw new Error(`manifest is not valid YAML: ${(error as Error).message}`);
+    throw new Error(`manifest is not valid YAML: ${(error as Error).message}`, { cause: error });
   }
   if (data === null || typeof data !== "object" || Array.isArray(data)) {
     throw new Error("manifest must be a YAML mapping");

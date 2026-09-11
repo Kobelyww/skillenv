@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
@@ -69,6 +69,21 @@ describe("installSpecs with registry resolution", () => {
     expect(core?.version).toBe("1.0.0");
   });
 
+  it("skipExisting leaves an already-installed direct skill untouched", async () => {
+    const home = useTempHome()();
+    const env = createEnv("skip-env", home);
+    const skillDir = mkdtempSync(path.join(tmpdir(), "direct-skip-"));
+    writeFileSync(path.join(skillDir, "SKILL.md"), "---\nname: local-one\n---\noriginal", "utf8");
+    await installSpecs(env.root, home, [skillDir]);
+    const installedPath = path.join(env.root, "skills", path.basename(skillDir), "SKILL.md");
+    writeFileSync(installedPath, "---\nname: local-one\n---\nmodified locally", "utf8");
+
+    // Reinstall without force would normally error; skip-existing keeps files.
+    const outcome = await installSpecs(env.root, home, [skillDir], { skipExisting: true });
+    expect(outcome.installed).toHaveLength(1);
+    expect(readFileSync(installedPath, "utf8")).toContain("modified locally");
+  });
+
   it("installs direct local paths beside registry names", async () => {
     const home = useTempHome()();
     const env = createEnv("mixed-env", home);
@@ -115,8 +130,9 @@ describe("installSpecs with registry resolution", () => {
   });
 });
 
-function makeRegistrySkill(root: string, name: string, _version: string, dependencies?: string[]): void {
+function makeRegistrySkill(root: string, name: string, _version: string, _dependencies?: string[]): void {
   void _version;
+  void _dependencies;
   const dir = path.join(root, name);
   mkdirSync(dir, { recursive: true });
   const front = ["---", `name: ${name}`, "---", "", `# ${name}`, ""];

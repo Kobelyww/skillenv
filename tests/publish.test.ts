@@ -70,7 +70,8 @@ describe("publishSkill", () => {
     expect(payload.skills.map((skill) => skill.name)).toEqual(["aaa", "zzz"]);
 
     // Republishing the same name replaces the entry.
-    publishSkill(dir, { registry: registryFile, source: "github:o/r/zzz@v2.1.0" }).entry;
+    const republished = publishSkill(dir, { registry: registryFile, source: "github:o/r/zzz@v2.1.0" });
+    expect(republished.entry.versions["2.0.0"]).toBeDefined();
     const second = JSON.parse(readFileSync(registryFile, "utf8")) as {
       skills: { name: string; versions: Record<string, unknown> }[];
     };

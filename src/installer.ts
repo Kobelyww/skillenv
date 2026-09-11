@@ -52,8 +52,8 @@ export async function installSpecs(
   const warnings: string[] = [];
 
   for (const spec of directSpecs) {
-    const name = await installDirectSource(envRoot, spec, force);
-    installed.push({ name, source: spec, requiredBy: ["manifest"] });
+    const targetName = await installDirectSource(envRoot, spec, force, skipExisting);
+    installed.push({ name: targetName, source: spec, requiredBy: ["manifest"] });
   }
 
   if (nameSpecs.length > 0) {
@@ -94,8 +94,27 @@ export function toCatalogEntry(skill: RegistrySkill): CatalogEntry {
   return entry;
 }
 
-async function installDirectSource(envRoot: string, spec: string, force: boolean): Promise<string> {
+async function installDirectSource(
+  envRoot: string,
+  spec: string,
+  force: boolean,
+  skipExisting: boolean,
+): Promise<string> {
   const source = parseSourceSpec(spec);
+  const targetDir =
+    source?.kind === "github"
+      ? path.join(envRoot, "skills", path.posix.basename(source.path))
+      : source?.kind === "local"
+        ? path.join(envRoot, "skills", path.basename(path.resolve(source.dir)))
+        : null;
+  if (
+    skipExisting &&
+    !force &&
+    targetDir &&
+    statSync(targetDir, { throwIfNoEntry: false })?.isDirectory()
+  ) {
+    return path.basename(targetDir);
+  }
   if (source?.kind === "github") {
     return installGitHubSkill(envRoot, source, force);
   }

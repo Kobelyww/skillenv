@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-import path from "node:path";
 import process from "node:process";
 import { Command } from "commander";
 import pc from "picocolors";
@@ -14,9 +13,8 @@ import {
   renameEnv,
 } from "./env.js";
 import { checkEnv, describeEnv, diffEnvs, providerReadiness } from "./inspect.js";
-import { parseGitHubSource } from "./install.js";
 import { installSpecs } from "./installer.js";
-import { exportManifest, loadManifestFile, parseManifest, readManifest, writeManifest } from "./manifest.js";
+import { exportManifest, loadManifestFile, readManifest, writeManifest } from "./manifest.js";
 import { installPlugin, listPlugins } from "./plugins.js";
 import { getPreset, listPresets } from "./preset.js";
 import { publishSkill } from "./publish.js";
