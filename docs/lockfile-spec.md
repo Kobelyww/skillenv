@@ -1,52 +1,67 @@
 # Lockfile Spec
 
-`lock.json` records what was installed into an environment. It is written under
-the environment root:
+`lock.json` records exactly what was installed into an environment. It is
+machine-written — never edit it by hand; reinstall or `doctor` instead.
+
+## Location
 
 ```text
 ~/.skillenv/envs/<name>/lock.json
 ```
 
-Current format:
+## Format (version 2)
 
 ```json
 {
-  "version": 1,
+  "version": 2,
   "skills": [
     {
       "name": "pdf",
-      "source": "github:openai/skills/skills/.curated/pdf",
-      "installed_at": "2026-06-01T12:34:56Z",
-      "checksum": "sha256:..."
+      "source": "github:openai/skills/skills/.curated/pdf@main",
+      "installed_at": "2026-09-12T03:20:44Z",
+      "version": "1.0.0",
+      "dependencies": ["pdf-core@^1"],
+      "checksum": "sha256:9f2c…"
     }
   ],
   "plugins": [
     {
       "name": "latex@openai-bundled",
       "source": "latex@openai-bundled",
-      "installed_at": "2026-06-01T12:34:56Z"
+      "installed_at": "2026-09-12T03:20:44Z"
     }
   ]
 }
 ```
 
-## Semantics
+### Skill records
 
-`version` is the lockfile schema version.
+| Field | Meaning |
+|---|---|
+| `name` | Skill directory name under `skills/` |
+| `source` | Where it came from: `local:<abs-path>`, `github:<owner>/<repo>/<path>@<ref>`, or another registry source |
+| `installed_at` | UTC timestamp of the install |
+| `version` | Resolved semantic version (registry installs) or frontmatter version (direct installs) |
+| `dependencies` | Dependency specs this install pulled in, verbatim |
+| `checksum` | `sha256:` digest of the installed tree; omitted when the directory was absent at record time |
 
-`skills` records installed skills by environment-local name and original source.
-New skill records include `installed_at` and a deterministic directory
-`checksum`.
+### Checksum algorithm
 
-`plugins` records enabled plugin selectors by name and source. New plugin
-records include `installed_at`.
+The checksum is stable across machines and platforms:
 
-`installed_at` uses UTC ISO-8601 format with a trailing `Z`.
+1. Walk the skill directory; collect every file's path relative to the skill
+   root with `/` separators, sorted lexicographically.
+2. For each file in order, feed into sha256: the relative path, a NUL byte,
+   the file bytes, a NUL byte.
+3. Prefix the hex digest with `sha256:`.
 
-`checksum` is a `sha256:` digest over each file path and file content in the
-installed skill directory. `skillenv doctor` uses it to detect local skill
-content drift. Older lock records without checksums remain valid but cannot be
-checked for content drift.
+`skillenv doctor <env>` recomputes checksums and reports
+`checksum mismatch: skills/<name>` when installed content drifts from the
+lock.
 
-Future versions should add resolved references so GitHub and remote registry
-sources can be reproduced more strictly.
+### Version compatibility
+
+Version 1 locks (Python 1.x era: flat `{name, source, installed_at[, checksum]}`
+records, no `version`/`dependencies` fields) are read transparently and
+upgraded in place on the next write. Unknown fields are preserved per record
+when round-tripping through the CLI's own reads and writes.

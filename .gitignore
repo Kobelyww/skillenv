@@ -1,12 +1,23 @@
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
 .DS_Store
-.venv/
-.pytest_cache/
+.env
+.env.local
+
+# Python legacy artifacts
 __pycache__/
 *.py[cod]
-dist/
-build/
+.venv/
+.pytest_cache/
 *.egg-info/
 .coverage
 .mypy_cache/
 .ruff_cache/
 
+# Beads / Dolt files (added by bd init)
+.dolt/
+*.db
+.beads-credential-key
+.beads/proxieddb/

@@ -1,25 +1,40 @@
 {
-  "version": 1,
+  "version": 2,
   "skills": [
     {
       "name": "pdf",
-      "source": "github:openai/skills/skills/.curated/pdf",
-      "description": "Read, inspect, and create PDF documents."
+      "description": "Read, inspect, and create PDF documents.",
+      "versions": {
+        "1.0.0": { "source": "github:openai/skills/skills/.curated/pdf" }
+      }
     },
     {
       "name": "jupyter-notebook",
-      "source": "github:openai/skills/skills/.curated/jupyter-notebook",
-      "description": "Create and edit reproducible Jupyter notebooks."
+      "description": "Create and edit reproducible Jupyter notebooks.",
+      "versions": {
+        "1.0.0": { "source": "github:openai/skills/skills/.curated/jupyter-notebook" }
+      }
     },
     {
       "name": "transcribe",
-      "source": "github:openai/skills/skills/.curated/transcribe",
-      "description": "Transcribe audio and video recordings."
+      "description": "Transcribe audio and video recordings.",
+      "versions": {
+        "1.0.0": { "source": "github:openai/skills/skills/.curated/transcribe" }
+      }
     },
     {
       "name": "notion-research-documentation",
-      "source": "github:openai/skills/skills/.curated/notion-research-documentation",
-      "description": "Synthesize Notion research into structured reports."
+      "description": "Synthesize Notion research into structured reports.",
+      "versions": {
+        "1.0.0": { "source": "github:openai/skills/skills/.curated/notion-research-documentation" }
+      }
+    },
+    {
+      "name": "skillenv-basics",
+      "description": "First-party skill: teach any agent how to drive skillenv (create, install, run, export, agent).",
+      "versions": {
+        "1.0.0": { "source": "github:Kobelyww/skillenv/skills/skillenv-basics@main" }
+      }
     }
   ]
 }

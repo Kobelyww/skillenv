@@ -1,0 +1,4 @@
+name: claude-env
+adapter: claude
+skills: []
+plugins: []

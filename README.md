@@ -1,264 +1,248 @@
-# skillenv
+<div align="center">
 
-`skillenv` is a Conda-like environment manager for AI agent skills.
+# 🧰 skillenv
 
-The first release focuses on Codex. Each environment is an isolated `CODEX_HOME`,
-so skills, plugins, sessions, logs, and configuration can be separated by task.
+**A Conda-like environment manager for AI agent skills.**
 
-## Quick Start
+Give every task its own isolated agent home: skills, plugins, sessions, and
+configuration — for **Codex**, **Claude Code**, **pi**, and any agent CLI.
 
-```bash
-uv run skillenv create research
-uv run skillenv create research-lab --preset research
-uv run skillenv create research-lab --preset research --install-plugins
-uv run skillenv clone research research-v2
-uv run skillenv env list
-uv run skillenv env info research
-uv run skillenv doctor research
-uv run skillenv diff research coding
-uv run skillenv install research /path/to/a-skill
-uv run skillenv install research pdf
-uv run skillenv install research github:openai/skills/skills/.curated/pdf
-uv run skillenv plugin install research latex@openai-bundled
-uv run skillenv plugin list research
-uv run skillenv run research -- codex
-uv run skillenv export research > skillenv.yml
-uv run skillenv create -f skillenv.yml
-uv run skillenv registry list
-uv run skillenv registry search notebook
-uv run skillenv registry add team ./registry/skills.json
-uv run skillenv registry update
-uv run skillenv adapter codex --out plugins
-uv run skillenv adapter claude-code --out adapters
-uv run skillenv remove research
-```
+`npm install -g @kobelyww/skillenv`
 
-During editable development on macOS, if Python skips hidden `.pth` files and
-the console script cannot import `skillenv`, use:
+[![CI](https://github.com/Kobelyww/skillenv/actions/workflows/ci.yml/badge.svg)](../../actions)
+![Node](https://img.shields.io/badge/Node-20%2B-green)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-3178c6)
+![Tests](https://img.shields.io/badge/tests-115%20passing-brightgreen)
+![License](https://img.shields.io/badge/License-MIT-yellow)
 
-```bash
-PYTHONPATH=src uv run python -m skillenv --help
-```
+</div>
 
-Each environment lives under:
-
-```text
-~/.skillenv/envs/<name>
-```
-
-That directory acts as an independent Codex home:
-
-```text
-~/.skillenv/envs/research/
-  config.toml
-  skillenv.yml
-  lock.json
-  skills/
-  plugins/
-  sessions/
-  log/
-```
+---
 
 ## Why
 
-Codex skills are useful, but different workflows need different toolboxes.
-`skillenv` lets you keep a research environment with PDF, LaTeX, Zotero, and
-notebook skills separate from a coding environment with engineering plugins.
+Agent skill directories grow into a swamp: research skills mixed with coding
+skills, plugin configs clobbering each other, experiments leaking into your
+daily setup, and no record of what was installed from where.
 
-## Current Scope
-
-- Create, clone, list, export, import, run, and remove environments.
-- Inspect, diagnose, and compare environments with `env info`, `doctor`, and `diff`.
-- Install local skill directories containing `SKILL.md`.
-- Install bundled registry skills by name, such as `pdf`.
-- Install public GitHub skill directories with `github:owner/repo/path@ref`.
-- Track installed skills in `lock.json`.
-- Create environments from built-in presets: `clean`, `coding`, and `research`.
-- Record plugin selectors in environment `config.toml` and `lock.json`.
-- Inspect bundled, local, and remote registries.
-- Generate Codex and Claude Code adapter scaffolds.
-- Run any command with `CODEX_HOME` pointed at a selected environment.
-
-Dependency solving and semantic version constraints are intentionally left for
-later releases.
-
-## Presets
+`skillenv` solves it the way Conda solved Python environments:
 
 ```bash
-uv run skillenv preset list
-uv run skillenv create research-lab --preset research
+skillenv create research --preset research        # isolated env in one command
+skillenv install research pdf@^1.0                # versioned installs with dependencies
+skillenv run research                             # launch the agent inside the env
+skillenv export research > skillenv.yml           # reproducible manifests
+skillenv create -f skillenv.yml                   # recreate anywhere
 ```
 
-Built-in presets:
-
-- `clean`: no extra skills or plugins.
-- `coding`: engineering-oriented starting point.
-- `research`: PDF, notebook, LaTeX, Zotero, and transcription-oriented starting point.
-
-Presets write the intended skill/plugin sources into `skillenv.yml`; they do not
-automatically install marketplace plugins yet.
-
-To write preset plugin selectors into the environment `config.toml`, use:
-
-```bash
-uv run skillenv create research-lab --preset research --install-plugins
-```
-
-## Plugins
-
-`skillenv` records plugin selectors in an environment's `config.toml`:
-
-```bash
-uv run skillenv plugin install research latex@openai-bundled
-uv run skillenv plugin list research
-```
-
-This writes:
-
-```toml
-[plugins."latex@openai-bundled"]
-enabled = true
-```
-
-The command does not download plugin cache artifacts itself. It prepares the
-isolated Codex home so Codex can load enabled plugin selectors in that
-environment.
-
-## Reproducibility
-
-`skillenv install` records installed skills in `lock.json`. `skillenv export`
-uses that lock file when available, so another machine can recreate the
-environment:
-
-```bash
-uv run skillenv export research > skillenv.yml
-uv run skillenv create -f skillenv.yml
-```
-
-Clone an environment:
-
-```bash
-uv run skillenv clone research research-v2
-```
-
-`clone` copies skills, plugins, `config.toml`, `lock.json`, and `skillenv.yml`
-while rewriting the manifest name. It does not copy `sessions/` or `log/`.
-
-## Inspection
-
-Summarize an environment:
-
-```bash
-uv run skillenv env info research
-```
-
-Check an environment for common problems:
-
-```bash
-uv run skillenv doctor research
-```
-
-`doctor` currently verifies core files and checks that every installed skill
-directory contains `SKILL.md`.
-
-Compare two environments:
-
-```bash
-uv run skillenv diff research coding
-```
-
-`diff` compares skills and plugins recorded in each environment lock file.
-
-## Registry
-
-The repository includes a seed registry in:
+Each environment lives under `~/.skillenv/envs/<name>` and is a **complete,
+self-contained agent home**:
 
 ```text
-registry/skills.json
+~/.skillenv/envs/research/
+  config.toml        # adapter config (e.g. Codex plugins)
+  skillenv.yml       # manifest: adapter, skills, plugins
+  lock.json          # exact installs: source, version, checksum (sha256)
+  skills/            # installed skills (SKILL.md directories)
+  plugins/           # adapter plugin space
+  sessions/          # built-in agent session transcripts
+  log/               # per-env logs
 ```
 
-The packaged CLI reads the bundled copy and exposes:
+## Highlights
+
+| Capability | What you get |
+|---|---|
+| **Adapter system** | First-class isolation per agent CLI: `codex` → `CODEX_HOME`, `claude` → `CLAUDE_CONFIG_DIR`, `pi` → `PI_CONFIG_DIR`, plus `gemini` (experimental) and `generic` (any command via `SKILLENV_*` vars) |
+| **Versioned installs** | Skills install from a name + semver range (`pdf@^1.0`), a GitHub subtree (`github:owner/repo/path@ref`), or a local directory — recorded in `lock.json` with sha256 checksums |
+| **Dependency resolution** | Skills can declare dependencies; skillenv intersects semver constraints across the graph, detects conflicts with full requirer chains, and installs topologically |
+| **Registry v2** | Bundled registry + your own file/HTTP registry sources with caching, search, and a `registry publish` validation flow |
+| **Built-in coding agent** | `skillenv agent` — a streaming tool-calling agent over any OpenAI-compatible provider (DeepSeek, Nous Hermes, GLM, OpenAI, Ollama, ModelArts MaaS) with 10 workspace tools and skill injection |
+| **Reproducibility** | `export` emits a manifest from the lock; `create -f` recreates the environment elsewhere; `doctor` verifies layout and checksums |
+
+## Quick start
 
 ```bash
-uv run skillenv registry list
-uv run skillenv registry show pdf
-uv run skillenv registry search notebook
-uv run skillenv registry add team ./registry/skills.json
-uv run skillenv registry sources
-uv run skillenv registry update
+npm install -g @kobelyww/skillenv
+
+# 1. Create an environment from a preset
+skillenv create research --preset research
+
+# 2. Install skills (registry name, GitHub subtree, or local dir)
+skillenv install research github:openai/skills/skills/.curated/pdf
+skillenv install research ./my-skills/custom-search
+
+# 3. Inspect
+skillenv env list
+skillenv env info research
+skillenv doctor research
+
+# 4. Run an agent inside the environment
+skillenv run research -- codex          # CODEX_HOME=~/.skillenv/envs/research
+skillenv run research -- claude         # CLAUDE_CONFIG_DIR=...
+skillenv run research -- pi             # PI_CONFIG_DIR=...
+
+# 5. Reproduce elsewhere
+skillenv export research > skillenv.yml
 ```
 
-Registry sources may be local JSON files or HTTP(S) URLs with this shape:
+Zero-config rule: `skillenv` never needs an API key — only the built-in agent
+talks to providers, and only when you ask it to.
 
-```json
-{
-  "version": 1,
-  "skills": [
-    {
-      "name": "pdf",
-      "source": "github:openai/skills/skills/.curated/pdf",
-      "description": "Read, inspect, and create PDF documents."
-    }
-  ]
-}
-```
+## The built-in agent
 
-The bundled registry is always available. Added registries are cached under
-`~/.skillenv/registry-cache` after `skillenv registry update`. The registry is
-metadata, not a full dependency resolver.
-
-## Codex Adapter
-
-Generate a Codex plugin adapter scaffold:
+`skillenv agent` turns any environment into a working coding agent. It speaks
+the OpenAI-compatible chat protocol, so every major provider works:
 
 ```bash
-uv run skillenv adapter codex --out plugins
+export DEEPSEEK_API_KEY=sk-...
+skillenv agent research -p deepseek -m deepseek-chat --dir ~/my-project
+
+export NOUS_API_KEY=...                 # Nous Hermes
+skillenv agent research -p nous --dir ~/paper
+
+export GLM_API_KEY=...                  # Zhipu GLM
+skillenv agent research -p glm -m glm-4.6
+
+# Fully local with Ollama — no key at all
+skillenv agent research -p ollama -m qwen3:8b
 ```
 
-This creates:
+What the agent can do:
+
+- **Tools**: `read_file`, `write_file`, `edit_file` (unique-match enforced),
+  `list_dir`, `glob`, `grep`, `run_command` (timeout-guarded shell),
+  `web_fetch` (SSRF-guarded: private addresses blocked), `skill_list`,
+  `skill_read`
+- **Skills**: the environment's skills are injected as a catalog; the agent
+  loads a skill's full `SKILL.md` with `skill_read` before following it — or
+  inline specific skills with `--skills pdf,latex`
+- **Sessions**: every turn persists to `sessions/`; resume with
+  `--session <id>` or `--continue`, inspect with `skillenv session list|show`
+- **Streaming**: SSE token streaming with compact tool-card rendering
+  (`-q` for text-only)
+
+Interactive REPL: run `skillenv agent <env>` without a prompt. Slash commands:
+`/exit`, `/sessions`, `/skills`.
+
+One-shot and scriptable:
+
+```bash
+echo "explain this repo's build system" | skillenv agent research --dir .
+skillenv agent research -q "why does make test fail?" --max-iterations 10
+```
+
+## Dependency resolution
+
+Skills declare dependencies in `SKILL.md` frontmatter:
+
+```markdown
+---
+name: latex-paper
+description: Write LaTeX papers with citations.
+version: 1.2.0
+dependencies:
+  - pdf@^1.0
+  - zotero@>=2
+---
+```
+
+`skillenv install env latex-paper` resolves the full closure: it picks the
+highest registry version satisfying every constraint, merges constraints from
+multiple requirers, reports conflicts with the full chain
+(`a requires ^1.0; b requires ^2.0; available: 1.0.0, 2.0.0`), tolerates
+cycles, and installs dependencies before dependents.
+
+## Registries
+
+The bundled registry ships versioned entries. Add your own sources — a file
+path or an HTTPS URL — and refresh the cache:
+
+```bash
+skillenv registry add team https://skills.example.com/team.json
+skillenv registry update
+skillenv registry search latex
+skillenv registry show pdf
+```
+
+Publish a skill to a registry with validation (frontmatter completeness,
+semver version):
+
+```bash
+skillenv registry publish ./my-skill \
+  --source github:me/skills/skills/my-skill@v1.0.0 \
+  --registry ./team.json
+```
+
+## Adapters
+
+| Adapter | Isolation variable | Notes |
+|---|---|---|
+| `codex` | `CODEX_HOME` | Fully supported; plugin selectors recorded in `config.toml` |
+| `claude` | `CLAUDE_CONFIG_DIR` | Fully supported; `skills/` doubles as user-level skills |
+| `pi` | `PI_CONFIG_DIR` | Best effort |
+| `gemini` | — (experimental) | gemini-cli has no config-dir override yet; `SKILLENV_*` vars only |
+| `generic` | — | Any command: `SKILLENV_ENV`, `SKILLENV_ENV_ROOT`, `SKILLENV_SKILLS_DIR` |
+
+```bash
+skillenv create claude-env --adapter claude
+skillenv run claude-env                     # defaults to the adapter's command
+```
+
+## Commands
 
 ```text
-plugins/skillenv-codex/
-  .codex-plugin/plugin.json
-  skills/skillenv/SKILL.md
+skillenv create [name] [-f manifest] [-p preset] [-a adapter] [--install-plugins]
+skillenv clone <src> <target>
+skillenv install <env> <specs...> [--force] [--skip-existing]
+skillenv remove <env>
+skillenv export <env>
+skillenv doctor <env>
+skillenv diff <a> <b>
+skillenv run <env> [-- command...]
+skillenv agent <env> [prompt] [-p provider] [-m model] [-s session] [-c] [-q] [--dir] [--skills]
+skillenv env list | env info <env>
+skillenv preset list
+skillenv registry list | show | search | add | sources | update | publish
+skillenv adapter list | codex | claude-code | pi | gemini
+skillenv plugin install | plugin list
+skillenv session list | session show
 ```
 
-The adapter is intentionally thin. Core behavior stays in the standalone
-`skillenv` CLI.
+## Library usage
 
-## Claude Code Adapter
+```ts
+import {
+  createEnv, installSpecs, exportManifest, checkEnv,
+  resolveProvider, runAgentTurn,
+} from "@kobelyww/skillenv";
 
-Generate a Claude Code skill adapter scaffold:
-
-```bash
-uv run skillenv adapter claude-code --out adapters
+const env = createEnv("triage", process.env.HOME + "/.skillenv");
+await installSpecs(env.root, process.env.HOME + "/.skillenv", ["pdf@^1"]);
 ```
-
-This creates:
-
-```text
-adapters/skillenv-claude-code/
-  .claude/skills/skillenv/SKILL.md
-```
-
-Copy or move the generated `.claude/skills/skillenv` directory into a Claude
-Code project, or into your user-level Claude Code skills directory, depending
-on how you want to load the adapter.
 
 ## Documentation
 
-Project documentation lives in `docs/`:
+- [Quickstart](docs/quickstart.md) — first environment in five minutes
+- [Agent guide](docs/agent.md) — providers, tools, sessions, skill injection
+- [Adapters](docs/adapters.md) — per-CLI isolation details and caveats
+- [Manifest spec](docs/manifest-spec.md) — `skillenv.yml` format
+- [Lockfile spec](docs/lockfile-spec.md) — `lock.json` format and checksums
+- [Publishing](docs/publishing.md) — release and registry workflow
 
-- `docs/quickstart.md`: first environment setup.
-- `docs/adapters.md`: Codex and Claude Code adapter notes.
-- `docs/publishing.md`: release and distribution checklist.
-- `docs/manifest-spec.md`: `skillenv.yml` format.
-- `docs/lockfile-spec.md`: `lock.json` format.
+## Development
 
-## Open Source Project Files
+```bash
+npm install
+npm run build       # tsup → dist/
+npm test            # vitest (115 tests incl. e2e CLI + mock provider)
+npm run typecheck   # tsc --noEmit
+npm run skillenv -- env list   # run the CLI from source
+```
 
-- `LICENSE`: MIT license.
-- `CONTRIBUTING.md`: development and PR guidelines.
-- `.github/workflows/ci.yml`: test matrix for Python 3.11, 3.12, and 3.13.
-- `.github/workflows/release.yml`: PyPI publishing on version tags.
-- `RELEASE.md`: release checklist.
+The Python 1.x implementation was replaced by this TypeScript rewrite; its
+history remains in git (`main` branch).
+
+## License
+
+[MIT](LICENSE)

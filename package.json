@@ -1,0 +1,68 @@
+{
+  "name": "@kobelyww/skillenv",
+  "version": "2.0.0",
+  "description": "Conda-like environment manager for AI agent skills — isolated homes for Codex, Claude Code, pi, and any agent CLI.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Haobo Wang <Kobelyww>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Kobelyww/skillenv.git"
+  },
+  "homepage": "https://github.com/Kobelyww/skillenv#readme",
+  "bugs": "https://github.com/Kobelyww/skillenv/issues",
+  "keywords": [
+    "agent",
+    "skills",
+    "codex",
+    "claude-code",
+    "environment",
+    "cli",
+    "isolated-environments",
+    "skill-registry"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "bin": {
+    "skillenv": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "registry",
+    "docs",
+    "README.md",
+    "LICENSE"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsx src/cli.ts",
+    "skillenv": "tsx src/cli.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "adm-zip": "^0.5.16",
+    "commander": "^14.0.0",
+    "picocolors": "^1.1.1",
+    "semver": "^7.7.2",
+    "yaml": "^2.8.0"
+  },
+  "devDependencies": {
+    "@types/adm-zip": "^0.5.7",
+    "@types/node": "^24.0.0",
+    "@types/semver": "^7.7.0",
+    "tsup": "^8.5.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.0"
+  }
+}

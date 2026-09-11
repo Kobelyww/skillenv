@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "registries": [
+    {
+      "name": "conflict",
+      "url": "/var/folders/v5/hp35skz527l1zwkv7qxggr280000gn/T/conf-vmt0jx/registry.json"
+    },
+    {
+      "name": "team",
+      "url": "/var/folders/v5/hp35skz527l1zwkv7qxggr280000gn/T/reg-Tg54mp/team.json"
+    },
+    {
+      "name": "test",
+      "url": "/var/folders/v5/hp35skz527l1zwkv7qxggr280000gn/T/skills-Aequae/registry.json"
+    }
+  ]
+}

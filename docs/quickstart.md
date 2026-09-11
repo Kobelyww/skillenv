@@ -1,64 +1,90 @@
 # Quickstart
 
-`skillenv` manages isolated agent skill environments. The first supported
-runtime is Codex, where each environment is a separate `CODEX_HOME`.
+Five minutes from zero to an isolated agent environment.
 
-Create a clean environment:
-
-```bash
-uv run skillenv create research
-```
-
-Create from a preset:
+## Install
 
 ```bash
-uv run skillenv create research-lab --preset research --install-plugins
+npm install -g @kobelyww/skillenv
+skillenv version
 ```
 
-Clone an existing environment:
+Requires Node 20+.
+
+## Create your first environment
 
 ```bash
-uv run skillenv clone research research-v2
+skillenv create research
+# created research: ~/.skillenv/envs/research
 ```
 
-Install a skill:
+Or start from a preset:
 
 ```bash
-uv run skillenv install research pdf
+skillenv preset list
+skillenv create research --preset research
 ```
 
-Inspect the environment:
+The directory layout:
+
+```text
+~/.skillenv/envs/research/
+  config.toml   skillenv.yml   lock.json
+  skills/       plugins/       sessions/       log/
+```
+
+Everything an agent CLI needs lives inside this one directory.
+
+## Install skills
+
+Three source kinds — mix them freely:
 
 ```bash
-uv run skillenv env info research
+# registry name (versioned, resolves dependencies)
+skillenv install research pdf@^1.0
+
+# GitHub subtree (any repo, any path, any ref)
+skillenv install research github:openai/skills/skills/.curated/pdf
+
+# local directory (must contain SKILL.md)
+skillenv install research ./my-skills/custom-search
 ```
 
-Run a health check:
+Every install is recorded in `lock.json` with its source and a sha256
+checksum. `skillenv doctor research` re-verifies the checksums any time.
+
+## Run an agent inside it
 
 ```bash
-uv run skillenv doctor research
+# Codex: CODEX_HOME points at the environment
+skillenv run research -- codex
+
+# Claude Code: CLAUDE_CONFIG_DIR points at the environment
+skillenv create claude-research --adapter claude
+skillenv run claude-research -- claude
+
+# or use the built-in agent — no external CLI needed
+export DEEPSEEK_API_KEY=sk-...
+skillenv agent research --dir ~/my-project
 ```
 
-Compare two environments:
+## Reproduce it somewhere else
 
 ```bash
-uv run skillenv diff research coding
+skillenv export research > skillenv.yml
+# on another machine
+skillenv create -f skillenv.yml
 ```
 
-Run Codex with the environment active:
+## Day-2 commands
 
 ```bash
-uv run skillenv run research -- codex
+skillenv env list              # all environments
+skillenv env info research     # what's inside one
+skillenv diff research work    # what differs between two
+skillenv clone research research-v2
+skillenv remove research-v2
 ```
 
-Export a reproducible manifest:
-
-```bash
-uv run skillenv export research > skillenv.yml
-```
-
-Recreate an environment from that manifest:
-
-```bash
-uv run skillenv create -f skillenv.yml
-```
+Next: [the built-in agent](agent.md) · [adapters](adapters.md) ·
+[manifest spec](manifest-spec.md)
