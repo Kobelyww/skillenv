@@ -2,36 +2,48 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, rewrite/typescript-v2]
   pull_request:
 
 jobs:
   test:
-    name: Python ${{ matrix.python-version }}
-    runs-on: ubuntu-latest
+    name: Node ${{ matrix.node-version }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.11", "3.12", "3.13"]
+        os: [ubuntu-latest, macos-latest]
+        node-version: ["20", "22"]
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v5
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Set up Node
+        uses: actions/setup-node@v4
         with:
-          python-version: ${{ matrix.python-version }}
+          node-version: ${{ matrix.node-version }}
+          cache: npm
 
       - name: Install dependencies
-        run: uv sync --dev
+        run: npm ci
 
-      - name: Run tests
-        run: PYTHONPATH=src uv run pytest -q
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Build
+        run: npm run build
+
+      - name: Test
+        run: npm test
 
       - name: Verify CLI
-        run: PYTHONPATH=src uv run python -m skillenv version
+        run: node dist/cli.js version
 
+      - name: Smoke — environment lifecycle
+        run: |
+          export SKILLENV_HOME=$(mktemp -d)
+          node dist/cli.js create smoke --preset clean
+          node dist/cli.js doctor smoke
+          node dist/cli.js export smoke
+          node dist/cli.js remove smoke
