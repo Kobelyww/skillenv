@@ -7,6 +7,7 @@ import type { AgentRenderEvents } from "./render.js";
 import {
   chatCompletionStream,
   type ChatMessage,
+  type CompletionResult,
   type ResolvedProvider,
   type ToolCall,
 } from "./providers.js";
@@ -16,6 +17,10 @@ export interface AgentOptions {
   envRoot: string;
   envName: string;
   provider: ResolvedProvider;
+  /** Failover target when the primary provider fails before any output. */
+  fallbackProvider?: ResolvedProvider;
+  /** Restrict the toolbox; default is all tools. Unknown names are ignored. */
+  tools?: string[];
   workdir: string;
   /** Skill names to inline fully in the system prompt (others are listed + on-demand). */
   inlineSkills?: string[];
@@ -96,7 +101,8 @@ export async function runAgentTurn(
   messages: ChatMessage[],
   render: AgentRenderEvents,
 ): Promise<AgentTurnResult> {
-  const tools = defaultTools();
+  const allTools = defaultTools();
+  const tools = options.tools ? allTools.filter((tool) => options.tools?.includes(tool.name)) : allTools;
   const schemas = toolSchemas(tools);
   const context: ToolContext = { workdir: options.workdir, envRoot: options.envRoot };
   const maxIterations = options.maxIterations ?? 25;
@@ -109,21 +115,70 @@ export async function runAgentTurn(
   let totalToolCalls = 0;
   const usage = { prompt_tokens: 0, completion_tokens: 0 };
 
+  /**
+   * One streaming request with provider failover: if the primary fails
+   * before any content was streamed (connect error, HTTP error), retry once
+   * against the fallback provider. Once deltas have reached the terminal, a
+   * failure propagates — retrying would duplicate partial output.
+   */
+  const request = async (
+    requestMessages: ChatMessage[],
+    requestTools: typeof schemas,
+    onDelta: (text: string) => void,
+  ): Promise<CompletionResult> => {
+    let emitted = 0;
+    const counting = (text: string): void => {
+      emitted += text.length;
+      onDelta(text);
+    };
+    try {
+      return await chatCompletionStream(options.provider, requestMessages, requestTools, counting, {
+        temperature: options.temperature,
+        signal: options.signal,
+      });
+    } catch (error) {
+      if (emitted > 0 || !options.fallbackProvider) throw error;
+      render.onInfo(
+        `provider '${options.provider.id}' failed (${(error as Error).message.split("\n")[0]}); failing over to '${options.fallbackProvider.id}'`,
+      );
+      return chatCompletionStream(options.fallbackProvider, requestMessages, requestTools, counting, {
+        temperature: options.temperature,
+        signal: options.signal,
+      });
+    }
+  };
+
   for (;;) {
     iteration += 1;
     if (iteration > maxIterations) {
-      render.onInfo(`reached max iterations (${maxIterations}); stopping`);
-      break;
+      render.onInfo(`reached max iterations (${maxIterations}); asking the model for a final summary`);
+      // Graceful degradation: one last request with no tools so the model
+      // wraps up instead of cutting off mid-work.
+      const summary = await request(
+        [
+          ...messages,
+          {
+            role: "user",
+            content:
+              "You have reached the tool-call iteration limit. Stop making changes and give a concise final summary: what you completed, what remains, and how far verification got.",
+          },
+        ],
+        [],
+        render.onTextDelta,
+      );
+      usage.prompt_tokens += summary.usage?.prompt_tokens ?? 0;
+      usage.completion_tokens += summary.usage?.completion_tokens ?? 0;
+      messages.push({ role: "assistant", content: summary.content });
+      return {
+        content: summary.content,
+        toolCalls: totalToolCalls,
+        iterations: iteration,
+        usage,
+      };
     }
     render.onTurnStart(iteration);
 
-    const completion = await chatCompletionStream(
-      options.provider,
-      messages,
-      schemas,
-      render.onTextDelta,
-      { temperature: options.temperature, signal: options.signal },
-    );
+    const completion = await request(messages, schemas, render.onTextDelta);
     usage.prompt_tokens += completion.usage?.prompt_tokens ?? 0;
     usage.completion_tokens += completion.usage?.completion_tokens ?? 0;
 
@@ -151,8 +206,6 @@ export async function runAgentTurn(
       });
     }
   }
-
-  return { content: "", toolCalls: totalToolCalls, iterations: iteration, usage };
 }
 
 /** Skills recorded in the environment lock, for session provenance. */

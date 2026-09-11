@@ -312,6 +312,96 @@ describe("agent loop", () => {
     expect(followUp.messages.some((m) => m.role === "tool")).toBe(true);
   });
 
+  it("degrades gracefully at the iteration limit with a tool-less summary", async () => {    const env = createEnv("limit-env", HOME);
+    // Smart mock: requests carrying `tools` get a tool call; the summary
+    // request (no tools) gets the final content.
+    const server = http.createServer((req, res) => {
+      let body = "";
+      req.on("data", (chunk) => {
+        body += chunk;
+      });
+      req.on("end", () => {
+        const parsed = JSON.parse(body) as { tools?: unknown };
+        res.writeHead(200, { "Content-Type": "text/event-stream" });
+        if (parsed.tools) {
+          res.write(`${chunk({ tool_calls: [{ index: 0, id: "t", function: { name: "list_dir", arguments: "{}" } }] }, "tool_calls")}\n\n`);
+        } else {
+          res.write(`${chunk({ content: "Wrapped up: nothing left to do." }, "stop")}\n\n`);
+        }
+        res.end("data: [DONE]\n\n");
+      });
+    });
+    servers.push(server);
+    const url = await new Promise<string>((resolve) => {
+      server.listen(0, "127.0.0.1", () => {
+        resolve(`http://127.0.0.1:${(server.address() as { port: number }).port}/v1`);
+      });
+    });
+    const provider: ResolvedProvider = { id: "test", displayName: "Test", baseUrl: url, apiKey: "", model: "m" };
+    const messages = [{ role: "user" as const, content: "keep going" }];
+    const infos: string[] = [];
+    const result = await runAgentTurn(
+      { envRoot: env.root, envName: "limit-env", provider, workdir: HOME, maxIterations: 2 },
+      messages,
+      {
+        onTextDelta: () => {},
+        onTurnStart: () => {},
+        onToolCall: () => {},
+        onToolResult: () => {},
+        onInfo: (line) => infos.push(line),
+      },
+    );
+    expect(infos.some((line) => line.includes("max iterations (2)"))).toBe(true);
+    expect(result.iterations).toBe(3);
+    expect(result.content).toBe("Wrapped up: nothing left to do.");
+    expect(messages.at(-1)?.content).toBe("Wrapped up: nothing left to do.");
+  });
+
+  it("fails over to the fallback provider when the primary fails before output", async () => {
+    const env = createEnv("failover-env", HOME);
+    // Primary: always 500. Fallback: normal tool-call + final answer exchange.
+    const primary = await startSseServer([], { status: 500 });
+    const { url: fallbackUrl, requests } = await startSseServer([
+      sse(undefined, { id: "t1", name: "list_dir", args: "{}" }),
+      sse("Answer via fallback."),
+    ]);
+    const infos: string[] = [];
+    const result = await runAgentTurn(
+      {
+        envRoot: env.root,
+        envName: "failover-env",
+        provider: { id: "primary", displayName: "Primary", baseUrl: primary.url, apiKey: "", model: "m" },
+        fallbackProvider: { id: "backup", displayName: "Backup", baseUrl: fallbackUrl, apiKey: "", model: "fb" },
+        workdir: HOME,
+      },
+      [{ role: "user", content: "hi" }],
+      {
+        onTextDelta: () => {},
+        onTurnStart: () => {},
+        onToolCall: () => {},
+        onToolResult: () => {},
+        onInfo: (line) => infos.push(line),
+      },
+    );
+    expect(result.content).toBe("Answer via fallback.");
+    expect(infos.some((line) => line.includes("failing over to 'backup'"))).toBe(true);
+    expect(requests.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("restricts the toolbox via the tools allowlist", async () => {
+    const env = createEnv("tools-env", HOME);
+    const { url, requests } = await startSseServer([sse("ok")]);
+    const provider: ResolvedProvider = { id: "test", displayName: "Test", baseUrl: url, apiKey: "", model: "m" };
+    await runAgentTurn(
+      { envRoot: env.root, envName: "tools-env", provider, workdir: HOME, tools: ["read_file", "grep"] },
+      [{ role: "user", content: "hi" }],
+      { onTextDelta: () => {}, onTurnStart: () => {}, onToolCall: () => {}, onToolResult: () => {}, onInfo: () => {} },
+    );
+    const first = requests[0] as { tools?: { function: { name: string } }[] };
+    const names = (first.tools ?? []).map((t) => t.function.name);
+    expect(names).toEqual(["read_file", "grep"]);
+  });
+
   it("builds a system prompt with skill inventory", () => {
     const env = createEnv("prompt-env", HOME);
     makeSkill(path.join(env.root, "skills"), "latex", { description: "Typeset documents" });

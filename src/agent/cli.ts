@@ -34,6 +34,9 @@ interface AgentCliOptions {
   model?: string;
   baseUrl?: string;
   apiKey?: string;
+  fallbackProvider?: string;
+  fallbackModel?: string;
+  tools?: string;
   dir?: string;
   skills?: string;
   session?: string;
@@ -54,6 +57,9 @@ export function registerAgentCommands(program: Command): void {
     .option("-m, --model <model>", "Model name (defaults to the provider preset).")
     .option("--base-url <url>", "Override the provider base URL.")
     .option("--api-key <key>", "Override the API key (else the provider's env var).")
+    .option("--fallback-provider <id>", "Failover provider used when the primary fails before any output.")
+    .option("--fallback-model <model>", "Model for the fallback provider.")
+    .option("--tools <names>", "Comma-separated tool allowlist (default: all tools).")
     .option("--dir <path>", "Working directory for tools (default: current directory).")
     .option("--skills <names>", "Comma-separated skill names to inline into the system prompt.")
     .option("-s, --session <id>", "Reuse an existing session.")
@@ -120,11 +126,27 @@ async function runAgentCommand(
     fail((error as Error).message);
   }
 
+  let fallbackProvider: ReturnType<typeof resolveProvider> | undefined;
+  if (options.fallbackProvider) {
+    try {
+      fallbackProvider = resolveProvider({
+        provider: options.fallbackProvider,
+        model: options.fallbackModel,
+      });
+    } catch (error) {
+      fail(`fallback provider: ${(error as Error).message}`);
+    }
+  }
+
   const workdir = path.resolve(options.dir ?? process.cwd());
   const maxIterations = Math.max(1, Number.parseInt(options.maxIterations ?? "25", 10) || 25);
   const temperature =
     options.temperature !== undefined ? Number.parseFloat(options.temperature) : undefined;
   const inlineSkills = (options.skills ?? "")
+    .split(",")
+    .map((name) => name.trim())
+    .filter(Boolean);
+  const toolAllowlist = (options.tools ?? "")
     .split(",")
     .map((name) => name.trim())
     .filter(Boolean);
@@ -153,6 +175,8 @@ async function runAgentCommand(
     envRoot: env.root,
     envName: env.name,
     provider,
+    fallbackProvider,
+    tools: toolAllowlist.length > 0 ? toolAllowlist : undefined,
     workdir,
     inlineSkills,
     maxIterations,

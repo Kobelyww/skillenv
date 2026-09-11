@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Provider failover for the agent: `--fallback-provider` / `--fallback-model`
+  retry once against a second provider when the primary fails before any
+  output streamed; partial output is never duplicated.
+- `--tools` allowlist to restrict the agent toolbox.
+- Graceful iteration-limit wrap-up: at `--max-iterations` the agent emits a
+  final tool-less summary (completed / remaining / verification status)
+  instead of cutting off mid-task.
+- Live end-to-end verification against the DeepSeek API: full coding sessions
+  (implement CLI + unittest suite, multi-turn continuation, self-repair) with
+  independent result verification.
+
 ## 2.0.0 (2026-09-12)
 
 Complete TypeScript rewrite of skillenv (the Python 1.x line remains on the

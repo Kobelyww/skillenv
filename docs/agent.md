@@ -28,6 +28,21 @@ skillenv agent research -p ollama -m llama3.3          # fully local
 skillenv agent research --base-url http://gw.corp/v1 --api-key xxx --model internal-7b
 ```
 
+## Reliability
+
+- **Provider failover**: pass `--fallback-provider <id>` (and
+  `--fallback-model`). If the primary provider fails *before any output was
+  streamed* — connect error, HTTP error — the loop retries once against the
+  fallback and reports the switch. Once text has reached the terminal, a
+  failure propagates instead of retrying, so partial output is never
+  duplicated.
+- **Iteration-limit wrap-up**: when `--max-iterations` is reached, the agent
+  makes one final tool-less request asking the model for a concise summary of
+  completed work, remaining work, and verification status — instead of
+  cutting off mid-task.
+- **Tool allowlist**: `--tools read_file,grep,...` restricts the toolbox for
+  security-sensitive runs (e.g. drop `run_command`/`web_fetch`).
+
 ## Tools
 
 The agent has ten tools. Paths are relative to `--dir` (default: the current
