@@ -13,7 +13,7 @@ import {
   removeEnv,
   renameEnv,
 } from "./env.js";
-import { checkEnv, describeEnv, diffEnvs } from "./inspect.js";
+import { checkEnv, describeEnv, diffEnvs, providerReadiness } from "./inspect.js";
 import { parseGitHubSource } from "./install.js";
 import { installSpecs } from "./installer.js";
 import { exportManifest, loadManifestFile, parseManifest, readManifest, writeManifest } from "./manifest.js";
@@ -199,17 +199,27 @@ program
 program
   .command("doctor <env>")
   .description("Check an environment for common configuration problems.")
-  .action((envName: string) => {
+  .option("--agent", "Also report which built-in agent providers are ready to use.", false)
+  .action((envName: string, options: { agent?: boolean }) => {
     const env = mustGetEnv(envName);
     const result = checkEnv(env.root, env.name);
     if (result.ok) {
       process.stdout.write(`OK ${env.name}\n`);
-      return;
+    } else {
+      for (const issue of result.issues) {
+        process.stdout.write(`${issue}\n`);
+      }
     }
-    for (const issue of result.issues) {
-      process.stdout.write(`${issue}\n`);
+    if (options.agent) {
+      process.stdout.write("agent providers:\n");
+      for (const provider of providerReadiness()) {
+        const status = provider.ready ? "ready" : `missing ${provider.missing}`;
+        process.stdout.write(`  ${provider.id}\t${status}\n`);
+      }
     }
-    process.exit(1);
+    if (!result.ok) {
+      process.exit(1);
+    }
   });
 
 program

@@ -240,8 +240,15 @@ npm run typecheck   # tsc --noEmit
 npm run skillenv -- env list   # run the CLI from source
 ```
 
+## Dogfooding
+
+skillenv develops itself: the `env rename` command was implemented by
+`skillenv agent` (deepseek-chat) working in a copy of this repository, then
+reviewed, tested, and adopted. See `git log --grep "env rename"`.
+
 The Python 1.x implementation was replaced by this TypeScript rewrite; its
-history remains in git (`main` branch).
+history remains in git (pre-merge `main` history). See also
+[SECURITY.md](SECURITY.md) for the agent's tool-safety posture.
 
 ## License
 

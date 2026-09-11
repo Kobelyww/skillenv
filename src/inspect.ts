@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { getAdapter } from "./adapter.js";
+import { PROVIDERS } from "./agent/providers.js";
 import { directoryChecksum, readLock } from "./lock.js";
 import { listPlugins } from "./plugins.js";
 import { SKILL_FILE } from "./skill.js";
@@ -54,6 +55,38 @@ function readManifestAdapter(envRoot: string): string {
  * Health check: manifest/config presence, adapter-specific required files,
  * SKILL.md in every skill directory, and lock checksum verification.
  */
+export interface ProviderReadiness {
+  id: string;
+  displayName: string;
+  ready: boolean;
+  missing: string;
+}
+
+/** Which agent providers have their credentials configured (never fatal). */
+export function providerReadiness(): ProviderReadiness[] {
+  return Object.values(PROVIDERS).map((preset) => {
+    if (!preset.apiKeyEnv) {
+      return { id: preset.id, displayName: preset.displayName, ready: true, missing: "" };
+    }
+    const hasKey = Boolean(process.env[preset.apiKeyEnv]);
+    const needsBase = preset.baseUrlEnv ? Boolean(process.env[preset.baseUrlEnv]) : true;
+    if (preset.baseUrlEnv && !preset.baseUrl && !needsBase) {
+      return {
+        id: preset.id,
+        displayName: preset.displayName,
+        ready: false,
+        missing: `${preset.apiKeyEnv} and ${preset.baseUrlEnv}`,
+      };
+    }
+    return {
+      id: preset.id,
+      displayName: preset.displayName,
+      ready: hasKey,
+      missing: hasKey ? "" : preset.apiKeyEnv,
+    };
+  });
+}
+
 export function checkEnv(envRoot: string, name: string): DoctorResult {
   const issues: string[] = [];
   const adapterId = readManifestAdapter(envRoot);

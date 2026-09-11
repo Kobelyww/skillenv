@@ -122,6 +122,23 @@ describe("CLI end-to-end", () => {
     expect(listing).toContain("skillenv-basics");
   });
 
+  it("doctor --agent reports provider readiness without failing", () => {
+    cli(["create", "doctor-agent-env"]);
+    const result = cli(["doctor", "doctor-agent-env", "--agent"]);
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("agent providers:");
+    expect(result.stdout).toContain("deepseek");
+    expect(result.stdout).toContain("ollama\tready");
+  });
+
+  it("env rename preserves content and rewrites the manifest", () => {
+    cli(["create", "to-rename"]);
+    expect(cli(["env", "rename", "to-rename", "renamed-env"]).status).toBe(0);
+    expect(cli(["env", "info", "renamed-env"]).stdout).toContain("name: renamed-env");
+    expect(cli(["doctor", "renamed-env"]).stdout).toBe("OK renamed-env\n");
+    expect(cli(["env", "rename", "ghost", "nope"]).status).not.toBe(0);
+  });
+
   it("unknown commands fail gracefully", () => {
     const result = cli(["definitely-not-a-command"]);
     expect(result.status).not.toBe(0);

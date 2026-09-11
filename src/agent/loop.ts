@@ -290,6 +290,13 @@ export async function runAgentTurn(
   }
 }
 
+/** Tool names active for an agent run (allowlist applied). */
+export function presentToolNames(allowlist?: string[]): string[] {
+  const all = defaultTools();
+  const active = allowlist ? all.filter((tool) => allowlist.includes(tool.name)) : all;
+  return active.map((tool) => tool.name);
+}
+
 /** Skills recorded in the environment lock, for session provenance. */
 export function envSkillNames(envRoot: string): string[] {
   return readLock(envRoot).skills.map((skill) => skill.name);

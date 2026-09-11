@@ -14,7 +14,7 @@ import {
 } from "./session.js";
 import { endTurn, quietRender, terminalRender, type AgentRenderEvents } from "./render.js";
 import { resolveProvider, type ChatMessage } from "./providers.js";
-import { envSkillNames, presentSkillNames, runAgentTurn } from "./loop.js";
+import { envSkillNames, presentSkillNames, presentToolNames, runAgentTurn, type AgentTurnResult } from "./loop.js";
 
 function fail(message: string): never {
   process.stderr.write(`${pc.red("error:")} ${message}\n`);
@@ -198,12 +198,14 @@ async function runAgentCommand(
       fail("no prompt given; pass one as an argument or pipe text to stdin");
     }
     session.messages.push({ role: "user", content: effectivePrompt });
+    let turn;
     try {
-      await runAgentTurn(agentOptions, session.messages as ChatMessage[], render);
+      turn = await runAgentTurn(agentOptions, session.messages as ChatMessage[], render);
     } catch (error) {
       fail((error as Error).message);
     }
     endTurn();
+    render.onInfo(usageLine(turn));
     session.updated_at = new Date().toISOString().replace(/\.\d+Z$/, "Z");
     saveSession(env.root, session);
     exitFlushed(0);
@@ -212,7 +214,7 @@ async function runAgentCommand(
 
   const rl = createInterface({ input: process.stdin, output: process.stdout });
   process.stderr.write(
-    `${pc.dim("interactive REPL — /exit to quit, /sessions to list, /skills to show env skills")}\n`,
+    `${pc.dim("interactive REPL — /exit to quit, /sessions to list, /skills to show env skills, /tools to list active tools")}\n`,
   );
 
   try {
@@ -234,26 +236,40 @@ async function runAgentCommand(
         }
         continue;
       }
+      if (line === "/tools") {
+        for (const name of presentToolNames(agentOptions.tools)) {
+          process.stdout.write(`${name}\n`);
+        }
+        continue;
+      }
       if (line.startsWith("/")) {
         process.stderr.write(`${pc.dim(`unknown command: ${line}`)}\n`);
         continue;
       }
 
       session.messages.push({ role: "user", content: line });
+      let turn;
       try {
-        await runAgentTurn(agentOptions, session.messages as ChatMessage[], render);
+        turn = await runAgentTurn(agentOptions, session.messages as ChatMessage[], render);
       } catch (error) {
         process.stderr.write(`${pc.red("error:")} ${(error as Error).message}\n`);
         session.messages.pop();
         continue;
       }
       endTurn();
+      render.onInfo(usageLine(turn));
       session.updated_at = new Date().toISOString().replace(/\.\d+Z$/, "Z");
       saveSession(env.root, session);
     }
   } finally {
     rl.close();
   }
+}
+
+function usageLine(turn: AgentTurnResult): string {
+  const tokens = turn.usage.prompt_tokens + turn.usage.completion_tokens;
+  if (tokens === 0) return `${turn.iterations} iteration(s) · ${turn.toolCalls} tool call(s)`;
+  return `${turn.iterations} iteration(s) · ${turn.toolCalls} tool call(s) · ${tokens} tokens (in ${turn.usage.prompt_tokens} / out ${turn.usage.completion_tokens})`;
 }
 
 async function readPipedStdin(): Promise<string | undefined> {
