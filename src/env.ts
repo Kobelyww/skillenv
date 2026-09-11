@@ -4,6 +4,7 @@ import {
   mkdirSync,
   readFileSync,
   readdirSync,
+  renameSync,
   rmSync,
   statSync,
   writeFileSync,
@@ -135,4 +136,30 @@ export function removeEnv(name: string, home: string): void {
     throw new Error(`environment not found: ${name}`);
   }
   rmSync(root, { recursive: true, force: true });
+}
+
+/**
+ * Rename an environment: move its directory under the envs home and rewrite
+ * the `name:` line of its manifest. Skills, plugins, lock.json, sessions and
+ * every other member of the directory are preserved as-is.
+ */
+export function renameEnv(oldName: string, newName: string, home: string): Env {
+  const source = getEnv(oldName, home);
+  const targetRoot = envPath(newName, home);
+  if (targetRoot === source.root) {
+    throw new Error(`environment already exists: ${newName}`);
+  }
+  if (statSync(targetRoot, { throwIfNoEntry: false })?.isDirectory()) {
+    throw new Error(`environment already exists: ${newName}`);
+  }
+
+  renameSync(source.root, targetRoot);
+
+  const manifestFile = path.join(targetRoot, "skillenv.yml");
+  if (existsSync(manifestFile)) {
+    const text = readFileSync(manifestFile, "utf8");
+    writeFileSync(manifestFile, rewriteManifestName(text, newName), "utf8");
+  }
+
+  return { name: newName, root: targetRoot };
 }

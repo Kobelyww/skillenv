@@ -201,7 +201,7 @@ skillenv doctor <env>
 skillenv diff <a> <b>
 skillenv run <env> [-- command...]
 skillenv agent <env> [prompt] [-p provider] [-m model] [-s session] [-c] [-q] [--dir] [--skills]
-skillenv env list | env info <env>
+skillenv env list | env info <env> | env rename <old> <new>
 skillenv preset list
 skillenv registry list | show | search | add | sources | update | publish
 skillenv adapter list | codex | claude-code | pi | gemini

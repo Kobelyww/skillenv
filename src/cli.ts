@@ -11,6 +11,7 @@ import {
   getEnv,
   listEnvs,
   removeEnv,
+  renameEnv,
 } from "./env.js";
 import { checkEnv, describeEnv, diffEnvs } from "./inspect.js";
 import { parseGitHubSource } from "./install.js";
@@ -270,6 +271,18 @@ envApp
     process.stdout.write(`adapter: ${summary.adapter}\n`);
     process.stdout.write(`skills: ${summary.skills.length > 0 ? summary.skills.join(", ") : "-"}\n`);
     process.stdout.write(`plugins: ${summary.plugins.length > 0 ? summary.plugins.join(", ") : "-"}\n`);
+  });
+
+envApp
+  .command("rename <old> <new>")
+  .description("Rename an environment, preserving its skills, plugins, and sessions.")
+  .action((oldName: string, newName: string) => {
+    try {
+      const renamed = renameEnv(oldName, newName, defaultHome());
+      process.stdout.write(`renamed ${oldName} -> ${renamed.name}: ${renamed.root}\n`);
+    } catch (error) {
+      fail((error as Error).message);
+    }
   });
 
 const presetApp = program.command("preset").description("Inspect built-in environment presets.");

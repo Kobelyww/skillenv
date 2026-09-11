@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { createEnv, cloneEnv, getEnv, listEnvs, removeEnv, validateEnvName, rewriteManifestName } from "../src/env.js";
+import { createEnv, cloneEnv, getEnv, listEnvs, removeEnv, renameEnv, validateEnvName, rewriteManifestName } from "../src/env.js";
 import { useTempHome } from "./helpers.js";
 
 describe("validateEnvName", () => {
@@ -92,6 +92,46 @@ describe("cloneEnv", () => {
     createEnv("a", home);
     createEnv("b", home);
     expect(() => cloneEnv("a", "b", home)).toThrow("already exists");
+  });
+});
+
+describe("renameEnv", () => {
+  it("moves the directory, rewrites the manifest name, and preserves contents", () => {
+    const home = useTempHome()();
+    const source = createEnv("old-env", home);
+    mkdirSync(path.join(source.root, "skills", "pdf"), { recursive: true });
+    writeFileSync(path.join(source.root, "skills", "pdf", "SKILL.md"), "---\nname: pdf\n---\n", "utf8");
+    writeFileSync(path.join(source.root, "lock.json"), '{"version":2,"skills":[],"plugins":[]}\n', "utf8");
+
+    const renamed = renameEnv("old-env", "new-env", home);
+    expect(renamed.name).toBe("new-env");
+    expect(renamed.root).toBe(path.join(home, "envs", "new-env"));
+    expect(existsSync(path.join(home, "envs", "old-env"))).toBe(false);
+    expect(existsSync(path.join(renamed.root, "skills", "pdf", "SKILL.md"))).toBe(true);
+    expect(existsSync(path.join(renamed.root, "lock.json"))).toBe(true);
+    expect(existsSync(path.join(renamed.root, "sessions"))).toBe(true);
+    const manifest = readFileSync(path.join(renamed.root, "skillenv.yml"), "utf8");
+    expect(manifest).toContain("name: new-env");
+    expect(manifest).not.toContain("name: old-env");
+  });
+
+  it("throws when the source is missing", () => {
+    const home = useTempHome()();
+    expect(() => renameEnv("ghost", "new-env", home)).toThrow("environment not found: ghost");
+  });
+
+  it("throws when the target already exists", () => {
+    const home = useTempHome()();
+    createEnv("a", home);
+    createEnv("b", home);
+    expect(() => renameEnv("a", "b", home)).toThrow("environment already exists: b");
+  });
+
+  it("rejects invalid target names", () => {
+    const home = useTempHome()();
+    createEnv("a", home);
+    expect(() => renameEnv("a", "bad/name", home)).toThrow("path separators");
+    expect(() => renameEnv("a", "", home)).toThrow("cannot be empty");
   });
 });
 
