@@ -221,6 +221,21 @@ const env = createEnv("triage", process.env.HOME + "/.skillenv");
 await installSpecs(env.root, process.env.HOME + "/.skillenv", ["pdf@^1"]);
 ```
 
+## Verified against the real world
+
+All of the following were executed for real during development of this
+version (not simulated):
+
+- **Codex CLI 0.153.4** launched via `skillenv run` with `CODEX_HOME`
+  isolation; **Claude Code 2.1.139** with `CLAUDE_CONFIG_DIR` isolation.
+- **DeepSeek live sessions** (`deepseek-chat`): a full coding arc — implement
+  a CLI + unittest suite, multi-turn continuation, agent self-repair after a
+  failing import — with results verified independently; provider failover
+  from a dead endpoint to live DeepSeek; skill consumption via
+  `skill_list`/`skill_read` against a real installed skill.
+- **Real GitHub installs** from this repository and from
+  `openai/skills` (zipball download → subtree copy → checksum lock).
+
 ## Documentation
 
 - [Quickstart](docs/quickstart.md) — first environment in five minutes
