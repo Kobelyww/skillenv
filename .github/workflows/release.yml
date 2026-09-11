@@ -33,15 +33,16 @@ jobs:
           npm run build
 
       - name: Check version tag match
-        run: node -e "
-          const pkg = require('./package.json');
-          const tag = process.env.GITHUB_REF_NAME;
-          if (!tag.endsWith('v' + pkg.version)) {
-            console.error('tag ' + tag + ' does not match package version ' + pkg.version);
-            process.exit(1);
-          }
-          console.log('releasing', pkg.name + '@' + pkg.version);
-        "
+        run: |
+          node -e "
+            const pkg = require('./package.json');
+            const tag = process.env.GITHUB_REF_NAME;
+            if (!tag.endsWith('v' + pkg.version)) {
+              console.error('tag ' + tag + ' does not match package version ' + pkg.version);
+              process.exit(1);
+            }
+            console.log('releasing', pkg.name + '@' + pkg.version);
+          "
         env:
           GITHUB_REF_NAME: ${{ github.ref_name }}
 
