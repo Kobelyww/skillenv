@@ -18,7 +18,9 @@ const TOOL_RESULT_LIMIT = 400;
 
 export function quietRender(): AgentRenderEvents {
   return {
-    onTextDelta: () => {},
+    onTextDelta: (text) => {
+      process.stdout.write(text);
+    },
     onTurnStart: () => {},
     onToolCall: () => {},
     onToolResult: () => {},

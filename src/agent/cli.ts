@@ -182,6 +182,7 @@ async function runAgentCommand(
     endTurn();
     session.updated_at = new Date().toISOString().replace(/\.\d+Z$/, "Z");
     saveSession(env.root, session);
+    exitFlushed(0);
     return;
   }
 
@@ -238,4 +239,17 @@ async function readPipedStdin(): Promise<string | undefined> {
     chunks.push(chunk as Buffer);
   }
   return Buffer.concat(chunks).toString("utf8");
+}
+
+/**
+ * Exit after pending stdout writes flush. One-shot runs may be invoked by
+ * parents that hold the stdin pipe open; without this the process would
+ * linger after finishing its work.
+ */
+function exitFlushed(code: number): void {
+  const stream = process.stdout;
+  if (stream.writableLength === 0) {
+    process.exit(code);
+  }
+  stream.write("", () => process.exit(code));
 }
