@@ -19,6 +19,31 @@ configuration — for **Codex**, **Claude Code**, **pi**, and any agent CLI.
 
 ---
 
+## Architecture
+
+```mermaid
+flowchart LR
+    CLI[skillenv CLI]
+    subgraph Env["~/.skillenv/envs/<name>"]
+        M[skillenv.yml<br/>manifest]
+        L[lock.json<br/>sha256 checksums]
+        S[skills/]
+        P[plugins/]
+        SES[sessions/]
+    end
+    REG[Registry v2<br/>bundled + team sources]
+    subgraph Agents["agent CLIs + built-in agent"]
+        CX[codex<br/>CODEX_HOME]
+        CC[claude<br/>CLAUDE_CONFIG_DIR]
+        PI[pi<br/>PI_CONFIG_DIR]
+        AG[skillenv agent<br/>DeepSeek / Hermes / GLM / Ollama]
+    end
+    CLI --> Env
+    REG --> CLI
+    CLI --> Agents
+    AG --> S
+```
+
 ## Why
 
 Agent skill directories grow into a swamp: research skills mixed with coding
