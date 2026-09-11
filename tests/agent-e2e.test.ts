@@ -134,10 +134,15 @@ describe("agent end-to-end through the CLI", () => {
     const sessionsDir = path.join(HOME, "envs", "agent-e2e", "sessions");
     expect(existsSync(sessionsDir)).toBe(true);
     const files = readdirSync(sessionsDir).sort();
-    const sessionFile = files.at(-1);
-    const transcript = readFileSync(path.join(sessionsDir, sessionFile as string), "utf8");
-    expect(transcript).toContain("read_file");
-    expect(transcript).toContain("Summarize the README again.");
+    expect(files.length).toBeGreaterThanOrEqual(2);
+    // Sessions within the same second share a timestamp prefix, so scan all
+    // transcripts instead of relying on filename order.
+    const transcripts = files.map((file) =>
+      readFileSync(path.join(sessionsDir, file), "utf8"),
+    );
+    expect(transcripts.some((text) => text.includes("read_file"))).toBe(true);
+    expect(transcripts.some((text) => text.includes("Summarize the README again."))).toBe(true);
+    expect(transcripts.some((text) => text.includes("Summarize the README."))).toBe(true);
   });
 
   it("streams errors clearly when the provider is unreachable", async () => {
