@@ -41,6 +41,7 @@ interface AgentCliOptions {
   skills?: string;
   session?: string;
   continueSession?: boolean;
+  confirmShell?: boolean;
   quiet?: boolean;
   maxIterations?: string;
   temperature?: string;
@@ -60,6 +61,7 @@ export function registerAgentCommands(program: Command): void {
     .option("--fallback-provider <id>", "Failover provider used when the primary fails before any output.")
     .option("--fallback-model <model>", "Model for the fallback provider.")
     .option("--tools <names>", "Comma-separated tool allowlist (default: all tools).")
+    .option("--confirm-shell", "Ask before every shell command (interactive terminals only).", false)
     .option("--dir <path>", "Working directory for tools (default: current directory).")
     .option("--skills <names>", "Comma-separated skill names to inline into the system prompt.")
     .option("-s, --session <id>", "Reuse an existing session.")
@@ -151,6 +153,26 @@ async function runAgentCommand(
     .map((name) => name.trim())
     .filter(Boolean);
 
+  let confirmShell: ((command: string) => Promise<boolean>) | undefined;
+  if (options.confirmShell) {
+    if (!process.stdin.isTTY) {
+      fail("--confirm-shell requires an interactive terminal");
+    }
+    confirmShell = async (command) => {
+      const rl = createInterface({ input: process.stdin, output: process.stdout });
+      try {
+        const answer = (
+          await rl.question(`${pc.yellow(`run command? ${command.slice(0, 200)}\n[y/N] `)}`)
+        )
+          .trim()
+          .toLowerCase();
+        return answer === "y" || answer === "yes";
+      } finally {
+        rl.close();
+      }
+    };
+  }
+
   const render: AgentRenderEvents = options.quiet ? quietRender() : terminalRender();
 
   // Session selection: explicit id > --continue (latest) > fresh.
@@ -177,6 +199,7 @@ async function runAgentCommand(
     provider,
     fallbackProvider,
     tools: toolAllowlist.length > 0 ? toolAllowlist : undefined,
+    confirmShell,
     workdir,
     inlineSkills,
     maxIterations,

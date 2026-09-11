@@ -12,6 +12,11 @@ export interface ToolContext {
   envRoot: string;
   /** Shell command timeout in milliseconds. */
   commandTimeoutMs?: number;
+  /**
+   * Human-in-the-loop gate for `run_command`: resolve true to execute.
+   * When absent, shell commands run without confirmation.
+   */
+  confirmShell?: (command: string) => Promise<boolean>;
 }
 
 export interface ToolResult {
@@ -325,9 +330,12 @@ const runCommandTool: ToolContext2 = {
     },
     required: ["command"],
   },
-  execute: (args, context) => {
+  execute: async (args, context) => {
     const command = typeof args.command === "string" ? args.command : "";
     if (command.trim().length === 0) return { ok: false, output: "command is required" };
+    if (context.confirmShell && !(await context.confirmShell(command))) {
+      return { ok: false, output: "the user declined to run this command; continue without it" };
+    }
     const timeoutMs = Math.min(
       typeof args.timeout_ms === "number" && args.timeout_ms > 0 ? args.timeout_ms : 60_000,
       context.commandTimeoutMs ?? 300_000,

@@ -4,9 +4,13 @@
 
 ### Added
 
-- Provider failover for the agent: `--fallback-provider` / `--fallback-model`
-  retry once against a second provider when the primary fails before any
-  output streamed; partial output is never duplicated.
+- Provider reliability for the agent: transient failures (network errors,
+  HTTP 429/5xx) retry with exponential backoff; `--fallback-provider` /
+  `--fallback-model` move the request to a second provider when the primary
+  exhausts retries before any output streamed. Partial output is never
+  duplicated.
+- `--confirm-shell` human-in-the-loop gate: every `run_command` requires an
+  interactive `[y/N]` confirmation.
 - `--tools` allowlist to restrict the agent toolbox.
 - Graceful iteration-limit wrap-up: at `--max-iterations` the agent emits a
   final tool-less summary (completed / remaining / verification status)

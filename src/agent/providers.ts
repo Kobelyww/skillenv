@@ -157,6 +157,22 @@ export interface StreamUsage {
   completion_tokens?: number;
 }
 
+/** HTTP-level failure from a provider call; carries the status for retry logic. */
+export class ProviderHttpError extends Error {
+  readonly status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = "ProviderHttpError";
+    this.status = status;
+  }
+
+  /** 429 and 5xx are transient; 4xx (except 429) are not worth retrying. */
+  get retryable(): boolean {
+    return this.status === 429 || this.status >= 500;
+  }
+}
+
 export interface CompletionResult {
   content: string;
   toolCalls: ToolCall[];
@@ -201,7 +217,8 @@ export async function chatCompletionStream(
 
   if (!response.ok || !response.body) {
     const detail = await response.text().catch(() => "");
-    throw new Error(
+    throw new ProviderHttpError(
+      response.status,
       `provider request failed: HTTP ${response.status} ${response.statusText}${detail ? `\n${detail.slice(0, 2000)}` : ""}`,
     );
   }

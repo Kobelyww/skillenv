@@ -6,6 +6,7 @@ import { readSkillMeta, SKILL_FILE } from "../skill.js";
 import type { AgentRenderEvents } from "./render.js";
 import {
   chatCompletionStream,
+  ProviderHttpError,
   type ChatMessage,
   type CompletionResult,
   type ResolvedProvider,
@@ -21,6 +22,8 @@ export interface AgentOptions {
   fallbackProvider?: ResolvedProvider;
   /** Restrict the toolbox; default is all tools. Unknown names are ignored. */
   tools?: string[];
+  /** Ask before every shell command (see ToolContext.confirmShell). */
+  confirmShell?: (command: string) => Promise<boolean>;
   workdir: string;
   /** Skill names to inline fully in the system prompt (others are listed + on-demand). */
   inlineSkills?: string[];
@@ -177,7 +180,11 @@ export async function runAgentTurn(
   const allTools = defaultTools();
   const tools = options.tools ? allTools.filter((tool) => options.tools?.includes(tool.name)) : allTools;
   const schemas = toolSchemas(tools);
-  const context: ToolContext = { workdir: options.workdir, envRoot: options.envRoot };
+  const context: ToolContext = {
+    workdir: options.workdir,
+    envRoot: options.envRoot,
+    confirmShell: options.confirmShell,
+  };
   const maxIterations = options.maxIterations ?? 25;
 
   if (!messages.some((message) => message.role === "system")) {
@@ -198,11 +205,44 @@ export async function runAgentTurn(
   const usage = { prompt_tokens: 0, completion_tokens: 0 };
 
   /**
-   * One streaming request with provider failover: if the primary fails
-   * before any content was streamed (connect error, HTTP error), retry once
-   * against the fallback provider. Once deltas have reached the terminal, a
-   * failure propagates — retrying would duplicate partial output.
+   * One streaming request with production reliability semantics:
+   * - retryable failures (network errors, HTTP 429/5xx) are retried with
+   *   exponential backoff against the primary provider;
+   * - when retries are exhausted and a fallback provider is configured, the
+   *   request moves to the fallback once (same retry budget);
+   * - if any content already streamed to the terminal, failures propagate —
+   *   retrying would duplicate partial output.
    */
+  const withRetries = async (
+    provider: ResolvedProvider,
+    requestMessages: ChatMessage[],
+    requestTools: typeof schemas,
+    onDelta: (text: string) => void,
+    attempts: number,
+  ): Promise<CompletionResult> => {
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= attempts; attempt++) {
+      try {
+        return await chatCompletionStream(provider, requestMessages, requestTools, onDelta, {
+          temperature: options.temperature,
+          signal: options.signal,
+        });
+      } catch (error) {
+        lastError = error;
+        const retryable = !(error instanceof ProviderHttpError) || error.retryable;
+        if (!retryable || attempt >= attempts) {
+          throw error;
+        }
+        const delayMs = 500 * 2 ** (attempt - 1);
+        render.onInfo(
+          `provider '${provider.id}' attempt ${attempt} failed (${(error as Error).message.split("\n")[0]}); retrying in ${delayMs}ms`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      }
+    }
+    throw lastError;
+  };
+
   const request = async (
     requestMessages: ChatMessage[],
     requestTools: typeof schemas,
@@ -214,19 +254,13 @@ export async function runAgentTurn(
       onDelta(text);
     };
     try {
-      return await chatCompletionStream(options.provider, requestMessages, requestTools, counting, {
-        temperature: options.temperature,
-        signal: options.signal,
-      });
+      return await withRetries(options.provider, requestMessages, requestTools, counting, 3);
     } catch (error) {
       if (emitted > 0 || !options.fallbackProvider) throw error;
       render.onInfo(
         `provider '${options.provider.id}' failed (${(error as Error).message.split("\n")[0]}); failing over to '${options.fallbackProvider.id}'`,
       );
-      return chatCompletionStream(options.fallbackProvider, requestMessages, requestTools, counting, {
-        temperature: options.temperature,
-        signal: options.signal,
-      });
+      return withRetries(options.fallbackProvider, requestMessages, requestTools, counting, 3);
     }
   };
 

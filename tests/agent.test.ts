@@ -433,6 +433,88 @@ describe("agent loop", () => {
     expect(disabled.compacted).toBe(false);
   });
 
+  it("retries transient 5xx with backoff before succeeding", async () => {
+    const env = createEnv("retry-env", HOME);
+    // A server that fails twice with 503 then answers correctly.
+    let failures = 0;
+    const server = http.createServer((req, res) => {
+      let body = "";
+      req.on("data", (c) => (body += c));
+      req.on("end", () => {
+        if (failures < 2) {
+          failures += 1;
+          res.writeHead(503, { "Content-Type": "text/plain" });
+          res.end("overloaded");
+          return;
+        }
+        JSON.parse(body);
+        res.writeHead(200, { "Content-Type": "text/event-stream" });
+        res.write(`${chunk({ content: "recovered" }, "stop")}\n\n`);
+        res.end("data: [DONE]\n\n");
+      });
+    });
+    servers.push(server);
+    const url = await new Promise<string>((resolve) => {
+      server.listen(0, "127.0.0.1", () => resolve(`http://127.0.0.1:${(server.address() as { port: number }).port}/v1`));
+    });
+    const infos: string[] = [];
+    const result = await runAgentTurn(
+      { envRoot: env.root, envName: "retry-env", provider: { id: "p", displayName: "P", baseUrl: url, apiKey: "", model: "m" }, workdir: HOME },
+      [{ role: "user", content: "hi" }],
+      { onTextDelta: () => {}, onTurnStart: () => {}, onToolCall: () => {}, onToolResult: () => {}, onInfo: (line) => infos.push(line) },
+    );
+    expect(result.content).toBe("recovered");
+    expect(infos.some((line) => line.includes("attempt 1 failed") && line.includes("retrying in 500ms"))).toBe(true);
+  }, 15000);
+
+  it("does not retry non-retryable 4xx errors", async () => {
+    const env = createEnv("no4xx-env", HOME);
+    const { url, requests } = await startSseServer([], { status: 400 });
+    await expect(
+      runAgentTurn(
+        { envRoot: env.root, envName: "no4xx-env", provider: { id: "p", displayName: "P", baseUrl: url, apiKey: "", model: "m" }, workdir: HOME },
+        [{ role: "user", content: "hi" }],
+        { onTextDelta: () => {}, onTurnStart: () => {}, onToolCall: () => {}, onToolResult: () => {}, onInfo: () => {} },
+      ),
+    ).rejects.toThrow(/HTTP 400/);
+    expect(requests.length).toBe(1);
+  });
+
+  it("honors confirmShell for run_command (decline and approve)", async () => {
+    const env = createEnv("confirm-env", HOME);
+    const answers: boolean[] = [false, true];
+    let turnIndex = -1;
+    const { url } = await startSseServer([
+      sse(undefined, { id: "t1", name: "run_command", args: JSON.stringify({ command: "echo hi" }) }),
+      sse(undefined, { id: "t2", name: "run_command", args: JSON.stringify({ command: "echo again" }) }),
+      sse("Done with both."),
+    ]);
+    const provider: ResolvedProvider = { id: "test", displayName: "Test", baseUrl: url, apiKey: "", model: "m" };
+    const toolResults: { ok: boolean; output: string }[] = [];
+    const result = await runAgentTurn(
+      {
+        envRoot: env.root,
+        envName: "confirm-env",
+        provider,
+        workdir: HOME,
+        confirmShell: async () => answers[++turnIndex] ?? false,
+      },
+      [{ role: "user", content: "run two commands" }],
+      {
+        onTextDelta: () => {},
+        onTurnStart: () => {},
+        onToolCall: () => {},
+        onToolResult: (_name, ok, output) => toolResults.push({ ok, output }),
+        onInfo: () => {},
+      },
+    );
+    expect(result.content).toBe("Done with both.");
+    expect(result.toolCalls).toBe(2);
+    expect(toolResults[0]?.ok).toBe(false);
+    expect(toolResults[0]?.output).toContain("declined");
+    expect(toolResults[1]?.ok).toBe(true);
+  });
+
   it("builds a system prompt with skill inventory", () => {
     const env = createEnv("prompt-env", HOME);
     makeSkill(path.join(env.root, "skills"), "latex", { description: "Typeset documents" });

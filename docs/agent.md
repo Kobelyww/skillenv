@@ -30,10 +30,13 @@ skillenv agent research --base-url http://gw.corp/v1 --api-key xxx --model inter
 
 ## Reliability
 
+- **Retries with backoff**: transient failures (network errors, HTTP 429/5xx)
+  are retried up to 3 attempts with exponential backoff (500ms/1s/2s).
+  Non-retryable 4xx errors surface immediately.
 - **Provider failover**: pass `--fallback-provider <id>` (and
-  `--fallback-model`). If the primary provider fails *before any output was
-  streamed* — connect error, HTTP error — the loop retries once against the
-  fallback and reports the switch. Once text has reached the terminal, a
+  `--fallback-model`). When the primary provider exhausts its retries *before
+  any output was streamed*, the loop moves to the fallback with the same
+  retry budget and reports the switch. Once text has reached the terminal, a
   failure propagates instead of retrying, so partial output is never
   duplicated.
 - **Iteration-limit wrap-up**: when `--max-iterations` is reached, the agent
@@ -42,6 +45,8 @@ skillenv agent research --base-url http://gw.corp/v1 --api-key xxx --model inter
   cutting off mid-task.
 - **Tool allowlist**: `--tools read_file,grep,...` restricts the toolbox for
   security-sensitive runs (e.g. drop `run_command`/`web_fetch`).
+- **Shell confirmation**: `--confirm-shell` asks `[y/N]` before every shell
+  command (interactive terminals only; see [SECURITY.md](../SECURITY.md)).
 
 ## Tools
 
