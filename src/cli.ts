@@ -3,7 +3,7 @@ import path from "node:path";
 import process from "node:process";
 import { Command } from "commander";
 import pc from "picocolors";
-import { ADAPTERS, getAdapter } from "./adapter.js";
+import { ADAPTERS, getAdapter, type AdapterSpec } from "./adapter.js";
 import { defaultHome } from "./config.js";
 import {
   cloneEnv,
@@ -18,6 +18,7 @@ import { installSpecs } from "./installer.js";
 import { exportManifest, loadManifestFile, parseManifest, readManifest, writeManifest } from "./manifest.js";
 import { installPlugin, listPlugins } from "./plugins.js";
 import { getPreset, listPresets } from "./preset.js";
+import { publishSkill } from "./publish.js";
 import {
   addRegistrySource,
   getRegistrySkill,
@@ -360,7 +361,45 @@ registryApp
     }
   });
 
+registryApp
+  .command("publish <skill-dir>")
+  .description("Validate a skill and emit (or upsert) a versioned registry entry.")
+  .option("-s, --source <spec>", "Published source spec recorded in the entry (e.g. github:owner/repo/path@v1.0.0).")
+  .option("-r, --registry <file>", "Upsert the entry into this registry JSON file instead of printing it.")
+  .option("-d, --depends <specs>", "Comma-separated dependency specs for the published version.")
+  .action((skillDir: string, options: { source?: string; registry?: string; depends?: string }) => {
+    try {
+      const result = publishSkill(skillDir, {
+        source: options.source,
+        registry: options.registry,
+        dependencies: (options.depends ?? "").split(","),
+      });
+      for (const warning of result.warnings) {
+        process.stderr.write(`${pc.yellow("warning:")} ${warning}\n`);
+      }
+      if (!options.registry) {
+        const entry = { version: 2, skills: [result.entry] };
+        process.stdout.write(`${JSON.stringify(entry, null, 2)}\n`);
+      } else {
+        process.stdout.write(`upserted ${result.entry.name}@${Object.keys(result.entry.versions)[0]} into ${options.registry}\n`);
+      }
+    } catch (error) {
+      fail((error as Error).message);
+    }
+  });
+
 const adapterApp = program.command("adapter").description("Generate agent adapter artifacts.");
+
+adapterApp
+  .command("list")
+  .description("List supported agent adapters and their isolation variables.")
+  .action(() => {
+    for (const id of Object.keys(ADAPTERS).sort()) {
+      const spec = ADAPTERS[id] as AdapterSpec;
+      const home = spec.homeVar ? `\t${spec.homeVar}` : "\t-";
+      process.stdout.write(`${spec.id}${home}\t${spec.displayName}\n`);
+    }
+  });
 
 adapterApp
   .command("codex")
