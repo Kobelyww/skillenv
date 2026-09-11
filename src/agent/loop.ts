@@ -27,6 +27,79 @@ export interface AgentOptions {
   maxIterations?: number;
   temperature?: number;
   signal?: AbortSignal;
+  /**
+   * Approximate character budget for the conversation; older tool outputs and
+   * assistant turns are replaced with placeholders when exceeded (roles and
+   * tool_call ids are preserved so pairing stays valid). 0 disables.
+   */
+  compactChars?: number;
+}
+
+/** Rough size of a message: content plus tool-call payloads. */
+function messageSize(message: ChatMessage): number {
+  let size = typeof message.content === "string" ? message.content.length : 0;
+  for (const call of message.tool_calls ?? []) {
+    size += call.function.name.length + call.function.arguments.length;
+  }
+  return size;
+}
+
+export const COMPACT_PLACEHOLDER = "[earlier content omitted to fit the context budget]";
+
+/**
+ * Shrink a conversation that exceeds `maxChars` by replacing the *payloads*
+ * of older messages with placeholders. Structure is never touched: roles,
+ * ordering, and tool_call ids survive, so assistant→tool pairing stays valid
+ * for the provider. System, first-user, and the most recent messages are
+ * always kept verbatim. Returns the (possibly same) array and whether any
+ * content was replaced.
+ */
+export function compactMessages(
+  messages: ChatMessage[],
+  maxChars: number,
+): { messages: ChatMessage[]; compacted: boolean } {
+  if (maxChars <= 0) return { messages, compacted: false };
+  const sizeOf = (list: ChatMessage[]): number => list.reduce((sum, m) => sum + messageSize(m), 0);
+  if (sizeOf(messages) <= maxChars) return { messages, compacted: false };
+
+  // Never touch the system prompt, the first user message, or the tail.
+  // The tail guard is at most a third of the conversation, so a short
+  // transcript with a few huge tool outputs can still be compacted.
+  const keepTail = Math.min(12, Math.max(2, Math.floor(messages.length / 3)));
+  const firstUser = messages.findIndex((m) => m.role === "user");
+  const compactableEnd = Math.max(0, messages.length - keepTail);
+  const out = messages.map((m) => ({ ...m }));
+  let compacted = false;
+
+  // Compact tool outputs first (they dominate size), then assistant turns,
+  // walking outward-in from the compactable middle.
+  for (let index = 1; index < compactableEnd; index++) {
+    const message = out[index];
+    if (!message) continue;
+    if (message.role === "tool" && message.content && message.content.length > 200) {
+      message.content = COMPACT_PLACEHOLDER;
+      compacted = true;
+    }
+    if (sizeOf(out) <= maxChars) return { messages: out, compacted };
+  }
+  for (let index = compactableEnd - 1; index > Math.max(firstUser, 0); index--) {
+    const message = out[index];
+    if (!message) continue;
+    if (message.role === "assistant") {
+      if (message.content && message.content.length > 200) {
+        message.content = COMPACT_PLACEHOLDER;
+        compacted = true;
+      }
+      for (const call of message.tool_calls ?? []) {
+        if (call.function.arguments.length > 200) {
+          call.function.arguments = "{}";
+          compacted = true;
+        }
+      }
+    }
+    if (sizeOf(out) <= maxChars) return { messages: out, compacted };
+  }
+  return { messages: out, compacted };
 }
 
 export interface AgentTurnResult {
@@ -109,6 +182,15 @@ export async function runAgentTurn(
 
   if (!messages.some((message) => message.role === "system")) {
     messages.unshift({ role: "system", content: buildSystemPrompt(options) });
+  }
+
+  // Trim the conversation to the context budget before the first request.
+  const budget = options.compactChars ?? 120_000;
+  const compacted = compactMessages(messages, budget);
+  if (compacted.compacted) {
+    render.onInfo(
+      `context exceeded ~${budget} characters; older tool outputs and turns were compacted`,
+    );
   }
 
   let iteration = 0;

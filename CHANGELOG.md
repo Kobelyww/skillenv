@@ -14,6 +14,10 @@
 - Live end-to-end verification against the DeepSeek API: full coding sessions
   (implement CLI + unittest suite, multi-turn continuation, self-repair) with
   independent result verification.
+- Session context compaction: conversations exceeding `compactChars`
+  (default ~120k chars) have older tool outputs and assistant turns replaced
+  with placeholders; roles and tool_call ids are preserved so provider
+  pairing stays valid. Disable with `compactChars: 0`.
 
 ## 2.0.0 (2026-09-12)
 

@@ -5,7 +5,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import http from "node:http";
 import { chatCompletionStream, resolveProvider, type ResolvedProvider } from "../src/agent/providers.js";
 import { defaultTools, executeTool, toolSchemas } from "../src/agent/tools.js";
-import { buildSystemPrompt, presentSkillNames, runAgentTurn } from "../src/agent/loop.js";
+import { buildSystemPrompt, compactMessages, COMPACT_PLACEHOLDER, presentSkillNames, runAgentTurn } from "../src/agent/loop.js";
 import { createSession, listSessions, loadSession, saveSession } from "../src/agent/session.js";
 import { createEnv } from "../src/env.js";
 import { makeSkill } from "./helpers.js";
@@ -400,6 +400,37 @@ describe("agent loop", () => {
     const first = requests[0] as { tools?: { function: { name: string } }[] };
     const names = (first.tools ?? []).map((t) => t.function.name);
     expect(names).toEqual(["read_file", "grep"]);
+  });
+
+  it("compacts oversized conversations while preserving pairing", async () => {
+    const filler = "x".repeat(6000);
+    const messages: ChatMessage[] = [
+      { role: "system", content: "system prompt" },
+      { role: "user", content: "first request" },
+      { role: "assistant", content: filler, tool_calls: [{ id: "call-1", type: "function", function: { name: "run_command", arguments: JSON.stringify({ command: filler }) } }] },
+      { role: "tool", tool_call_id: "call-1", name: "run_command", content: filler },
+      { role: "user", content: "second request" },
+      { role: "assistant", content: "short answer" },
+    ];
+    const { messages: out, compacted } = compactMessages(messages, 10_000);
+    expect(compacted).toBe(true);
+    const total = out.reduce((sum, m) => sum + (m.content?.length ?? 0), 0);
+    expect(total).toBeLessThan(10_000);
+    // Structure intact: pairing ids preserved, first user and tail verbatim.
+    expect(out[1]?.content).toBe("first request");
+    expect(out[2]?.tool_calls?.[0]?.id).toBe("call-1");
+    expect(out[3]?.tool_call_id).toBe("call-1");
+    expect(out.at(-1)?.content).toBe("short answer");
+    expect(out.some((m) => m.content?.includes(COMPACT_PLACEHOLDER))).toBe(true);
+
+    // Small conversations pass through untouched.
+    const small = compactMessages([{ role: "user", content: "hi" }], 20_000);
+    expect(small.compacted).toBe(false);
+    expect(small.messages[0]?.content).toBe("hi");
+
+    // Budget disabled.
+    const disabled = compactMessages(messages, 0);
+    expect(disabled.compacted).toBe(false);
   });
 
   it("builds a system prompt with skill inventory", () => {
