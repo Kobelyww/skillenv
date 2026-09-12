@@ -29,7 +29,9 @@ the tool level. Operate it the way you would operate any coding agent CLI:
 ## Skill installation
 
 - GitHub sources download a repository zipball over HTTPS and copy the
-  requested subtree; the subtree must contain a `SKILL.md`.
+  requested subtree; the subtree must contain a `SKILL.md`. Repo paths and
+  refs containing `.`/`..` traversal segments are rejected before any
+  download.
 - Skills are markdown + assets; they are not executed at install time.
   `lock.json` records a sha256 checksum of every installed tree, and
   `skillenv doctor <env>` detects tampering.

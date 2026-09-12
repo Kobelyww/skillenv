@@ -34,6 +34,8 @@
   for A/B model comparison.
 - `agent-eval --case <name>` runs a single case; `--max-iterations` sets the
   default cap for cases without their own.
+- GitHub skill sources reject path traversal (`..` in repo paths or refs)
+  before any download — found during a security-focused review round.
 - `edit_file` inserts `$&`-style replacement strings literally (found by an
   independent agent code review; regression test first, then a one-line fix).
 - `run_command` survives ENOBUFS: oversized output returns the captured
