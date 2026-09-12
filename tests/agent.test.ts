@@ -226,10 +226,12 @@ describe("tools", () => {
 
   it("survives output larger than the capture buffer", async () => {
     const tools = defaultTools();
+    // A script file keeps the command free of shell quoting differences.
+    writeFileSync(path.join(workdir, "big-output.js"), "process.stdout.write('x'.repeat(9 * 1024 * 1024));", "utf8");
     const big = await executeTool(tools, context, {
       id: "big1",
       type: "function",
-      function: { name: "run_command", arguments: JSON.stringify({ command: "node -e \"process.stdout.write('x'.repeat(9 * 1024 * 1024))\"", timeout_ms: 120_000 }) },
+      function: { name: "run_command", arguments: JSON.stringify({ command: "node big-output.js", timeout_ms: 120_000 }) },
     });
     expect(big.output).toContain("exceeded the capture buffer");
   });
