@@ -801,6 +801,17 @@ describe("agent loop", () => {
       workdir: "/tmp",
     });
     expect(withoutMemory).not.toContain("# Persistent memory");
+
+    // --system-extra appends verbatim instructions.
+    const withExtra = buildSystemPrompt({
+      envRoot: emptyEnv.root,
+      envName: "prompt-empty",
+      provider: { id: "x", displayName: "X", baseUrl: "", apiKey: "", model: "m" },
+      workdir: "/tmp",
+      systemExtra: "Always answer in Chinese.",
+    });
+    expect(withExtra).toContain("# Additional instructions");
+    expect(withExtra).toContain("Always answer in Chinese.");
   });
 });
 
