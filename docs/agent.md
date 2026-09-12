@@ -73,6 +73,8 @@ working directory).
 | `web_fetch` | Public http(s) only; DNS-checked SSRF guard blocks loopback/private/link-local targets; 32 KB cap |
 | `skill_list` | Installed skills with their frontmatter descriptions |
 | `skill_read` | Full `SKILL.md` of one skill; path traversal rejected |
+| `memory_read` | The environment's persistent memory (`memory/MEMORY.md`) |
+| `memory_write` | Append a durable fact to persistent memory (one entry per call) |
 
 ## Skill injection
 
@@ -86,6 +88,15 @@ catalog tools. Three ways to bring skills in:
    the system prompt — deterministic and costs tokens.
 3. **Preset-driven environments**: create task-shaped environments
    (`--preset research`) so the catalog matches the work.
+
+## Persistent memory
+
+The agent keeps durable notes per environment in `memory/MEMORY.md`
+(`memory_read`/`memory_write` tools). The system prompt instructs it to check
+memory when context may exist and to record durable preferences and lessons —
+so a working agent accumulates knowledge instead of starting cold every
+session. Memory is plain Markdown, safe to edit by hand, and never synced
+anywhere.
 
 ## Sessions
 

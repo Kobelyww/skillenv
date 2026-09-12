@@ -444,6 +444,47 @@ function isPrivateAddress(address: string): boolean {
   );
 }
 
+const memoryReadTool: ToolContext2 = {
+  name: "memory_read",
+  description:
+    "Read this environment's persistent memory (memory/MEMORY.md) — durable facts, decisions, and preferences recorded across sessions. Empty when nothing recorded yet.",
+  parameters: { type: "object", properties: {}, required: [] },
+  execute: (_args, context) => {
+    const file = path.join(context.envRoot, "memory", "MEMORY.md");
+    try {
+      return { ok: true, output: truncate(readFileSync(file, "utf8")) };
+    } catch {
+      return { ok: true, output: "(memory is empty)" };
+    }
+  },
+};
+
+const memoryWriteTool: ToolContext2 = {
+  name: "memory_write",
+  description:
+    'Append a durable fact to persistent memory (survives sessions). Keep entries one per line, e.g. "- 2026-09-12: user prefers vitest over jest". Do not store secrets.',
+  parameters: {
+    type: "object",
+    properties: {
+      content: { type: "string", description: "One memory entry (a single line or short paragraph)." },
+    },
+    required: ["content"],
+  },
+  execute: (args, context) => {
+    const content = typeof args.content === "string" ? args.content.trim() : "";
+    if (content.length === 0) return { ok: false, output: "content is required" };
+    if (content.includes("\n")) {
+      return { ok: false, output: "write one entry per memory_write call (no newlines)" };
+    }
+    const dir = path.join(context.envRoot, "memory");
+    mkdirSync(dir, { recursive: true });
+    const file = path.join(dir, "MEMORY.md");
+    const existing = existsSync(file) ? readFileSync(file, "utf8") : "# Environment memory\n";
+    writeFileSync(file, `${existing}${existing.endsWith("\n") ? "" : "\n"}- ${content}\n`, "utf8");
+    return { ok: true, output: `remembered: ${content.slice(0, 120)}` };
+  },
+};
+
 const skillListTool: ToolContext2 = {
   name: "skill_list",
   description: "List the skills installed in the current skillenv environment with their descriptions.",
@@ -500,6 +541,8 @@ export function defaultTools(): ToolContext2[] {
     webFetchTool,
     skillListTool,
     skillReadTool,
+    memoryReadTool,
+    memoryWriteTool,
   ];
 }
 

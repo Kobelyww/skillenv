@@ -140,6 +140,7 @@ export function buildSystemPrompt(options: AgentOptions): string {
     "- run_command executes real shell commands with a timeout; use it to build, test, and verify.",
     "- web_fetch reaches public URLs only (private networks are blocked).",
     "- Skills installed in this environment are domain playbooks. Use skill_list to see them and skill_read to load one before following it.",
+    "- You have persistent memory across sessions (memory_read/memory_write). At the start of a task, read memory if it may hold relevant context; when the user states a durable preference or a task ends with a reusable lesson, record it with memory_write. Never store secrets there.",
     "- When a task is complete, summarize concisely what changed and how you verified it.",
   ];
 

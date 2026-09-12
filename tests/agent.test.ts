@@ -262,11 +262,38 @@ describe("tools", () => {
     expect(traversal.ok).toBe(false);
   });
 
+  it("persists memory across calls within the environment", async () => {
+    const env = createEnv("memory-env", HOME);
+    const context2 = { workdir, envRoot: env.root };
+    const tools = defaultTools();
+    await executeTool(tools, context2, {
+      id: "m1",
+      type: "function",
+      function: { name: "memory_write", arguments: JSON.stringify({ content: "user prefers vitest" }) },
+    });
+    const read = await executeTool(tools, context2, {
+      id: "m2",
+      type: "function",
+      function: { name: "memory_read", arguments: "{}" },
+    });
+    expect(read.output).toContain("user prefers vitest");
+    // Empty memory reads as a friendly placeholder, not an error.
+    const fresh = { workdir, envRoot: createEnv("memory-fresh", HOME).root };
+    const empty = await executeTool(tools, fresh, {
+      id: "m3",
+      type: "function",
+      function: { name: "memory_read", arguments: "{}" },
+    });
+    expect(empty.output).toBe("(memory is empty)");
+  });
+
   it("exposes schemas for every tool", () => {
     const schemas = toolSchemas(defaultTools());
     const names = schemas.map((schema) => schema.function.name);
     expect(names).toContain("run_command");
     expect(names).toContain("skill_read");
+    expect(names).toContain("memory_read");
+    expect(names).toContain("memory_write");
     for (const schema of schemas) {
       expect(schema.function.parameters.type).toBe("object");
     }
