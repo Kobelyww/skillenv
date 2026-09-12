@@ -434,7 +434,6 @@ describe("agent loop", () => {
   });
 
   it("speaks the Anthropic Messages protocol when provider is anthropic", async () => {
-    const env = createEnv("anthropic-env", HOME);
     let captured: { url: string; headers: Record<string, unknown>; body: Record<string, unknown> } | null = null;
     const server = http.createServer((req, res) => {
       let body = "";

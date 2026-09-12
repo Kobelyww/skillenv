@@ -362,7 +362,7 @@ export async function anthropicChatCompletionStream(
       const content: AnthropicContentBlock[] = [];
       if (message.content) content.push({ type: "text", text: message.content });
       for (const call of message.tool_calls) {
-        let input: Record<string, unknown> = {};
+        let input: Record<string, unknown>;
         try {
           input = call.function.arguments.trim().length > 0 ? (JSON.parse(call.function.arguments) as Record<string, unknown>) : {};
         } catch {
