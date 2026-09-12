@@ -480,7 +480,8 @@ const memoryWriteTool: ToolContext2 = {
     mkdirSync(dir, { recursive: true });
     const file = path.join(dir, "MEMORY.md");
     const existing = existsSync(file) ? readFileSync(file, "utf8") : "# Environment memory\n";
-    writeFileSync(file, `${existing}${existing.endsWith("\n") ? "" : "\n"}- ${content}\n`, "utf8");
+    const entry = content.startsWith("- ") ? content : `- ${content}`;
+    writeFileSync(file, `${existing}${existing.endsWith("\n") ? "" : "\n"}${entry}\n`, "utf8");
     return { ok: true, output: `remembered: ${content.slice(0, 120)}` };
   },
 };

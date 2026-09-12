@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
@@ -668,6 +668,27 @@ describe("agent loop", () => {
     expect(prompt).toContain("# Inlined skills");
     expect(prompt).toContain("Typeset documents");
     expect(presentSkillNames(env.root)).toEqual(["latex"]);
+
+    // Non-empty memory is injected deterministically into the system prompt.
+    mkdirSync(path.join(env.root, "memory"), { recursive: true });
+    writeFileSync(path.join(env.root, "memory", "MEMORY.md"), "- user prefers vitest\n", "utf8");
+    const withMemory = buildSystemPrompt({
+      envRoot: env.root,
+      envName: "prompt-env",
+      provider: { id: "x", displayName: "X", baseUrl: "", apiKey: "", model: "m" },
+      workdir: "/tmp",
+    });
+    expect(withMemory).toContain("# Persistent memory (from previous sessions)");
+    expect(withMemory).toContain("user prefers vitest");
+    // Empty memory stays out of the prompt entirely.
+    const emptyEnv = createEnv("prompt-empty", HOME);
+    const withoutMemory = buildSystemPrompt({
+      envRoot: emptyEnv.root,
+      envName: "prompt-empty",
+      provider: { id: "x", displayName: "X", baseUrl: "", apiKey: "", model: "m" },
+      workdir: "/tmp",
+    });
+    expect(withoutMemory).not.toContain("# Persistent memory");
   });
 });
 

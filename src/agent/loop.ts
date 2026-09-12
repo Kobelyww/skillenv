@@ -148,10 +148,31 @@ export function buildSystemPrompt(options: AgentOptions): string {
   if (inline.length > 0) {
     lines.push("", "# Inlined skills", inline);
   }
+
+  // Deterministic memory recall: non-empty memory is injected into every
+  // session's system prompt (never trusted to the model's initiative).
+  const memory = readMemoryText(options.envRoot);
+  if (memory) {
+    lines.push("", "# Persistent memory (from previous sessions)", memory);
+  }
+
   if (options.systemExtra && options.systemExtra.trim().length > 0) {
     lines.push("", "# Additional instructions", options.systemExtra.trim());
   }
   return lines.join("\n");
+}
+
+const MEMORY_INJECT_LIMIT = 4000;
+
+function readMemoryText(envRoot: string): string {
+  try {
+    const text = readFileSync(path.join(envRoot, "memory", "MEMORY.md"), "utf8").trim();
+    if (text.length === 0) return "";
+    const body = text.length > MEMORY_INJECT_LIMIT ? `${text.slice(0, MEMORY_INJECT_LIMIT)}\n… (truncated)` : text;
+    return `${body}\n(This memory persists across sessions. Follow it unless the user overrides it.)`;
+  } catch {
+    return "";
+  }
 }
 
 function safeAdapter(envRoot: string): string {
