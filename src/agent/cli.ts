@@ -7,11 +7,13 @@ import { Command } from "commander";
 import { defaultHome } from "../config.js";
 import { getEnv, type Env } from "../env.js";
 import {
+  addSessionUsage,
   createSession,
   listSessions,
   loadSession,
   saveSession,
   sessionToMarkdown,
+  sessionTokenCount,
   type AgentSession,
 } from "./session.js";
 import { endTurn, quietRender, terminalRender, type AgentRenderEvents } from "./render.js";
@@ -179,8 +181,10 @@ export function registerAgentCommands(program: Command): void {
         return;
       }
       for (const session of sessions) {
+        const tokens = sessionTokenCount(session);
+        const usage = tokens === undefined ? "" : `\t${tokens} tok`;
         process.stdout.write(
-          `${session.id}\t${session.provider}/${session.model}\t${session.messages.length} msgs\t${session.updated_at}\n`,
+          `${session.id}\t${session.provider}/${session.model}\t${session.messages.length} msgs${usage}\t${session.updated_at}\n`,
         );
       }
     });
@@ -349,6 +353,7 @@ async function runAgentCommand(
     }
     endTurn();
     render.onInfo(usageLine(turn));
+    addSessionUsage(session, turn.usage);
     session.updated_at = new Date().toISOString().replace(/\.\d+Z$/, "Z");
     saveSession(env.root, session);
     exitFlushed(0);
@@ -373,8 +378,10 @@ async function runAgentCommand(
       if (line === "/exit" || line === "/quit") break;
       if (line === "/sessions") {
         for (const listed of listSessions(env.root)) {
+          const tokens = sessionTokenCount(listed);
+          const usage = tokens === undefined ? "" : `\t${tokens} tok`;
           process.stdout.write(
-            `${listed.id}\t${listed.provider}/${listed.model}\t${listed.messages.length} msgs\n`,
+            `${listed.id}\t${listed.provider}/${listed.model}\t${listed.messages.length} msgs${usage}\n`,
           );
         }
         continue;
@@ -427,6 +434,7 @@ async function runAgentCommand(
       }
       endTurn();
       render.onInfo(usageLine(turn));
+      addSessionUsage(session, turn.usage);
       session.updated_at = new Date().toISOString().replace(/\.\d+Z$/, "Z");
       saveSession(env.root, session);
     }

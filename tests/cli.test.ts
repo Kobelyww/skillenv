@@ -1,5 +1,5 @@
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { beforeAll, describe, expect, it } from "vitest";
@@ -167,6 +167,36 @@ describe("CLI end-to-end", () => {
     expect(readFileSync(out, "utf8")).toContain("hi there");
     const stdout = cli(["session", "export", "export-sessions", "agent-test"]);
     expect(stdout.stdout).toContain("## assistant");
+  });
+
+  it("session list shows a total token column when usage exists", () => {
+    cli(["create", "usage-sessions"]);
+    const sessionsDir = path.join(HOME, "envs", "usage-sessions", "sessions");
+    mkdirSync(sessionsDir, { recursive: true });
+    const base = {
+      created_at: "2026-09-12T00:00:00Z",
+      updated_at: "2026-09-12T00:00:00Z",
+      provider: "deepseek",
+      model: "deepseek-chat",
+      env: "usage-sessions",
+      messages: [{ role: "user", content: "hello" }],
+    };
+    writeFileSync(
+      path.join(sessionsDir, "agent-with-usage.json"),
+      JSON.stringify({ ...base, id: "agent-with-usage", total_usage: { prompt_tokens: 1500, completion_tokens: 23 } }),
+      "utf8",
+    );
+    writeFileSync(path.join(sessionsDir, "agent-no-usage.json"), JSON.stringify({ ...base, id: "agent-no-usage" }), "utf8");
+
+    const result = cli(["session", "list", "usage-sessions"]);
+    expect(result.status).toBe(0);
+    const lines = result.stdout.split("\n").filter((line) => line.includes("agent-"));
+    const withUsage = lines.find((line) => line.startsWith("agent-with-usage")) ?? "";
+    const withoutUsage = lines.find((line) => line.startsWith("agent-no-usage")) ?? "";
+    // Columns: id, provider/model, "N msgs", "N tok" (only when usage exists), updated_at.
+    expect(withUsage.split("\t")[3]).toBe("1523 tok");
+    expect(withoutUsage.split("\t")).toHaveLength(4);
+    expect(withoutUsage).not.toContain("tok");
   });
 
   (process.platform === "win32" ? it : it.skip)("run resolves npm .cmd shims on windows", () => {

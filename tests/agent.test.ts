@@ -6,7 +6,7 @@ import http from "node:http";
 import { anthropicChatCompletionStream, chatCompletionStream, resolveProvider, type ResolvedProvider } from "../src/agent/providers.js";
 import { defaultTools, executeTool, toolSchemas } from "../src/agent/tools.js";
 import { buildSystemPrompt, compactMessages, COMPACT_PLACEHOLDER, presentSkillNames, runAgentTurn } from "../src/agent/loop.js";
-import { createSession, listSessions, loadSession, saveSession } from "../src/agent/session.js";
+import { addSessionUsage, createSession, listSessions, loadSession, saveSession, sessionTokenCount } from "../src/agent/session.js";
 import { createEnv } from "../src/env.js";
 import { makeSkill } from "./helpers.js";
 
@@ -312,6 +312,32 @@ describe("sessions", () => {
     expect(listSessions(env.root).map((s) => s.id)).toContain(session.id);
 
     expect(() => loadSession(env.root, "missing")).toThrow("session not found");
+  });
+
+  it("accumulates turn usage and keeps zero totals undefined", () => {
+    const env = createEnv("usage-env", HOME);
+    const session = createSession(env.root, "usage-env", "deepseek", "deepseek-chat");
+    expect(session.total_usage).toBeUndefined();
+    expect(sessionTokenCount(session)).toBeUndefined();
+
+    // Empty turns must not create a noisy zero entry.
+    addSessionUsage(session, { prompt_tokens: 0, completion_tokens: 0 });
+    expect(session.total_usage).toBeUndefined();
+
+    addSessionUsage(session, { prompt_tokens: 100, completion_tokens: 23 });
+    expect(session.total_usage).toEqual({ prompt_tokens: 100, completion_tokens: 23 });
+    addSessionUsage(session, { prompt_tokens: 1200, completion_tokens: 200 });
+    expect(session.total_usage).toEqual({ prompt_tokens: 1300, completion_tokens: 223 });
+    expect(sessionTokenCount(session)).toBe(1523);
+
+    // Round-trips through save/load with the total intact.
+    saveSession(env.root, session);
+    expect(loadSession(env.root, session.id).total_usage).toEqual({ prompt_tokens: 1300, completion_tokens: 223 });
+
+    // A legacy session without the field stays clean on a zero turn.
+    const legacy = createSession(env.root, "usage-env", "deepseek", "deepseek-chat");
+    addSessionUsage(legacy, { prompt_tokens: 0, completion_tokens: 0 });
+    expect(JSON.parse(JSON.stringify(legacy))).not.toHaveProperty("total_usage");
   });
 });
 

@@ -11,6 +11,31 @@ export interface AgentSession {
   model: string;
   env: string;
   messages: ChatMessage[];
+  /** Cumulative token usage across every turn in this session (absent when 0). */
+  total_usage?: { prompt_tokens: number; completion_tokens: number };
+}
+
+/**
+ * Fold a turn's token usage into a session's cumulative counters. Older
+ * sessions without `total_usage` start from zero; when a turn and the
+ * existing total are both empty the field stays undefined so untouched
+ * sessions never gain a noisy zero entry.
+ */
+export function addSessionUsage(
+  session: AgentSession,
+  usage: { prompt_tokens: number; completion_tokens: number },
+): void {
+  if (usage.prompt_tokens === 0 && usage.completion_tokens === 0) return;
+  const total = session.total_usage ?? { prompt_tokens: 0, completion_tokens: 0 };
+  total.prompt_tokens += usage.prompt_tokens;
+  total.completion_tokens += usage.completion_tokens;
+  session.total_usage = total;
+}
+
+/** Human-readable total token count, or undefined when the session has none. */
+export function sessionTokenCount(session: AgentSession): number | undefined {
+  if (!session.total_usage) return undefined;
+  return session.total_usage.prompt_tokens + session.total_usage.completion_tokens;
 }
 
 export function sessionDir(envRoot: string): string {
