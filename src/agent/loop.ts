@@ -29,6 +29,7 @@ export interface AgentOptions {
   inlineSkills?: string[];
   maxIterations?: number;
   temperature?: number;
+  maxTokens?: number;
   signal?: AbortSignal;
   /**
    * Approximate character budget for the conversation; older tool outputs and

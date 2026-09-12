@@ -86,5 +86,5 @@ skillenv clone research research-v2
 skillenv remove research-v2
 ```
 
-Next: [the built-in agent](agent.md) · [adapters](adapters.md) ·
-[manifest spec](manifest-spec.md)
+Next: [the built-in agent](agent.md) · [agent evaluation suites](agent.md#evaluation-suites) ·
+[adapters](adapters.md) · [manifest spec](manifest-spec.md)

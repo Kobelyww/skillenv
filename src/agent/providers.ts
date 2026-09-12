@@ -207,7 +207,7 @@ export async function chatCompletionStream(
   messages: ChatMessage[],
   tools: ToolSchema[],
   onDelta: (text: string) => void,
-  options: { temperature?: number; signal?: AbortSignal } = {},
+  options: { temperature?: number; maxTokens?: number; signal?: AbortSignal } = {},
 ): Promise<CompletionResult> {
   const response = await fetch(`${provider.baseUrl}/chat/completions`, {
     method: "POST",
@@ -222,6 +222,7 @@ export async function chatCompletionStream(
       stream: true,
       stream_options: { include_usage: true },
       ...(options.temperature !== undefined ? { temperature: options.temperature } : {}),
+      ...(options.maxTokens !== undefined ? { max_tokens: options.maxTokens } : {}),
     }),
     signal: options.signal,
   });
@@ -339,7 +340,7 @@ export async function anthropicChatCompletionStream(
   messages: ChatMessage[],
   tools: ToolSchema[],
   onDelta: (text: string) => void,
-  options: { temperature?: number; signal?: AbortSignal } = {},
+  options: { temperature?: number; maxTokens?: number; signal?: AbortSignal } = {},
 ): Promise<CompletionResult> {
   const system = messages
     .filter((message) => message.role === "system")
@@ -385,7 +386,7 @@ export async function anthropicChatCompletionStream(
     },
     body: JSON.stringify({
       model: provider.model,
-      max_tokens: 8192,
+      max_tokens: options.maxTokens ?? 8192,
       ...(system.length > 0 ? { system } : {}),
       messages: conversation,
       ...(tools.length > 0
@@ -485,7 +486,7 @@ export function streamChat(
   messages: ChatMessage[],
   tools: ToolSchema[],
   onDelta: (text: string) => void,
-  options: { temperature?: number; signal?: AbortSignal } = {},
+  options: { temperature?: number; maxTokens?: number; signal?: AbortSignal } = {},
 ): Promise<CompletionResult> {
   if (ANTHROPIC_PROTOCOL_IDS.has(provider.id)) {
     return anthropicChatCompletionStream(provider, messages, tools, onDelta, options);

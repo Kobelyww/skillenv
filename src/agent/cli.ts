@@ -57,6 +57,7 @@ interface AgentCliOptions {
   confirmShell?: boolean;
   quiet?: boolean;
   maxIterations?: string;
+  maxTokens?: string;
   temperature?: string;
 }
 
@@ -81,6 +82,7 @@ export function registerAgentCommands(program: Command): void {
     .option("-c, --continue", "Continue the most recent session.", false)
     .option("-q, --quiet", "Suppress tool rendering (assistant text only).", false)
     .option("--max-iterations <n>", "Maximum tool-loop iterations per turn.", "25")
+    .option("--max-tokens <n>", "Max output tokens per completion.")
     .option("--temperature <x>", "Sampling temperature.")
     .argument("[prompt]", "One-shot prompt; omit for an interactive REPL.")
     .action(async (envName: string, prompt: string | undefined, options: AgentCliOptions) => {
@@ -251,6 +253,8 @@ async function runAgentCommand(
   const parsedTemperature =
     options.temperature !== undefined ? Number.parseFloat(options.temperature) : Number.NaN;
   const temperature = Number.isNaN(parsedTemperature) ? undefined : parsedTemperature;
+  const maxTokens =
+    options.maxTokens !== undefined ? Number.parseInt(options.maxTokens, 10) || undefined : undefined;
   const inlineSkills = (options.skills ?? "")
     .split(",")
     .map((name) => name.trim())
@@ -312,6 +316,7 @@ async function runAgentCommand(
     inlineSkills,
     maxIterations,
     temperature,
+    maxTokens,
   };
 
   const skills = presentSkillNames(env.root);
@@ -345,7 +350,7 @@ async function runAgentCommand(
 
   const rl = createInterface({ input: process.stdin, output: process.stdout });
   process.stderr.write(
-    `${pc.dim("interactive REPL — /exit to quit, /sessions to list, /skills to show env skills, /tools to list active tools")}\n`,
+    `${pc.dim("interactive REPL — /exit /sessions /skills /tools /export [file]")}\n`,
   );
 
   try {
@@ -376,6 +381,17 @@ async function runAgentCommand(
       if (line === "/tools") {
         for (const name of presentToolNames(agentOptions.tools)) {
           process.stdout.write(`${name}\n`);
+        }
+        continue;
+      }
+      if (line.startsWith("/export")) {
+        const target = line.split(/\s+/)[1];
+        const markdown = sessionToMarkdown(session);
+        if (target) {
+          writeFileSync(path.resolve(target), markdown, "utf8");
+          process.stderr.write(`${pc.dim(`exported to ${path.resolve(target)}`)}\n`);
+        } else {
+          process.stdout.write(markdown);
         }
         continue;
       }
