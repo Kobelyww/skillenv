@@ -386,7 +386,7 @@ export async function anthropicChatCompletionStream(
     },
     body: JSON.stringify({
       model: provider.model,
-      max_tokens: options.maxTokens ?? 8192,
+      max_tokens: options.maxTokens ?? 16_384,
       ...(system.length > 0 ? { system } : {}),
       messages: conversation,
       ...(tools.length > 0

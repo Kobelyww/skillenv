@@ -49,6 +49,10 @@ skillenv agent research --base-url http://gw.corp/v1 --api-key xxx --model inter
   cutting off mid-task.
 - **Tool allowlist**: `--tools read_file,grep,...` restricts the toolbox for
   security-sensitive runs (e.g. drop `run_command`/`web_fetch`).
+- **Context compaction**: conversations exceeding `--compact-chars` (default
+  ~120k chars) have older tool outputs and assistant turns replaced with
+  placeholders; roles and tool_call ids are preserved so provider pairing
+  stays valid. `--compact-chars 0` disables.
 - **Shell confirmation**: `--confirm-shell` asks `[y/N]` before every shell
   command (interactive terminals only; see [SECURITY.md](../SECURITY.md)).
 

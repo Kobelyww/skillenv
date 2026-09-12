@@ -85,6 +85,7 @@ export function registerAgentCommands(program: Command): void {
     .option("-q, --quiet", "Suppress tool rendering (assistant text only).", false)
     .option("--max-iterations <n>", "Maximum tool-loop iterations per turn.", "25")
     .option("--max-tokens <n>", "Max output tokens per completion.")
+    .option("--compact-chars <n>", "Conversation char budget before compaction (0 disables).", "120000")
     .option("--temperature <x>", "Sampling temperature.")
     .argument("[prompt]", "One-shot prompt; omit for an interactive REPL.")
     .action(async (envName: string, prompt: string | undefined, options: AgentCliOptions) => {
@@ -307,6 +308,7 @@ async function runAgentCommand(
   session.provider = provider.id;
   session.model = provider.model;
 
+  const compactChars = Number.parseInt(options.compactChars ?? "120000", 10);
   const agentOptions = {
     envRoot: env.root,
     envName: env.name,
@@ -320,6 +322,7 @@ async function runAgentCommand(
     maxIterations,
     temperature,
     maxTokens,
+    compactChars: Number.isNaN(compactChars) ? undefined : compactChars,
   };
 
   const skills = presentSkillNames(env.root);
