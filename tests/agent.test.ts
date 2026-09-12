@@ -598,6 +598,57 @@ describe("agent loop", () => {
     expect(provider.model).toBe("claude-sonnet-4-5");
   });
 
+  it("compacts aggressively and retries once on provider context overflow", async () => {
+    const env = createEnv("overflow-env", HOME);
+    let overflowSeen = false;
+    const server = http.createServer((req, res) => {
+      let body = "";
+      req.on("data", (c) => (body += c));
+      req.on("end", () => {
+        const parsed = JSON.parse(body) as { messages: { role: string; content: string | null }[] };
+        if (!overflowSeen) {
+          overflowSeen = true;
+          res.writeHead(400, { "Content-Type": "text/plain" });
+          res.end("maximum context length exceeded");
+          return;
+        }
+        // After the forced compaction the transcript must be smaller.
+        const size = parsed.messages.reduce((sum, m) => sum + (m.content?.length ?? 0), 0);
+        res.writeHead(200, { "Content-Type": "text/event-stream" });
+        res.write(`${chunk({ content: `recovered after compaction (size ${size})` }, "stop")}\n\n`);
+        res.end("data: [DONE]\n\n");
+      });
+    });
+    servers.push(server);
+    const url = await new Promise<string>((resolve) => {
+      server.listen(0, "127.0.0.1", () => resolve(`http://127.0.0.1:${(server.address() as { port: number }).port}/v1`));
+    });
+    const provider: ResolvedProvider = { id: "p", displayName: "P", baseUrl: url, apiKey: "", model: "m" };
+    const filler = "y".repeat(9000);
+    const messages: ChatMessage[] = [
+      { role: "user", content: "task" },
+      { role: "assistant", content: filler, tool_calls: [{ id: "t", type: "function", function: { name: "read_file", arguments: "{}" } }] },
+      { role: "tool", tool_call_id: "t", name: "read_file", content: filler },
+      { role: "user", content: "continue" },
+      { role: "assistant", content: filler },
+      { role: "user", content: "go on" },
+    ];
+    const infos: string[] = [];
+    const result = await runAgentTurn(
+      { envRoot: env.root, envName: "overflow-env", provider, workdir: HOME },
+      messages,
+      {
+        onTextDelta: () => {},
+        onTurnStart: () => {},
+        onToolCall: () => {},
+        onToolResult: () => {},
+        onInfo: (line) => infos.push(line),
+      },
+    );
+    expect(result.content).toContain("recovered after compaction");
+    expect(infos.some((line) => line.includes("context overflow"))).toBe(true);
+  });
+
   it("retries transient 5xx with backoff before succeeding", async () => {
     const env = createEnv("retry-env", HOME);
     // A server that fails twice with 503 then answers correctly.

@@ -31,6 +31,10 @@
   scaffolds, runner, skill frontmatter, and session markdown export.
 - Per-case provider overrides in eval suites (`provider:`/`model:` on a case)
   for A/B model comparison.
+- Context-overflow resilience: provider "maximum context length" errors now
+  trigger an aggressive compaction pass and a single retry before failing.
+  (Also fixed: the pre-turn compaction result was computed but never applied
+  to the conversation.)
 - Persistent memory: `memory_read`/`memory_write` tools backed by
   `memory/MEMORY.md` per environment — the agent accumulates durable facts,
   decisions, and preferences across sessions.

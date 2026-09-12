@@ -230,9 +230,13 @@ export async function runAgentTurn(
   }
 
   // Trim the conversation to the context budget before the first request.
+  // compactMessages returns a new array; splice it back in place because the
+  // session persists this same array object.
   const budget = options.compactChars ?? 120_000;
   const compacted = compactMessages(messages, budget);
   if (compacted.compacted) {
+    messages.length = 0;
+    messages.push(...compacted.messages);
     render.onInfo(
       `context exceeded ~${budget} characters; older tool outputs and turns were compacted`,
     );
@@ -241,6 +245,7 @@ export async function runAgentTurn(
   let iteration = 0;
   let totalToolCalls = 0;
   const toolNames: string[] = [];
+  let overflowRetried = false;
   const usage = { prompt_tokens: 0, completion_tokens: 0 };
 
   /**
@@ -295,6 +300,26 @@ export async function runAgentTurn(
     try {
       return await withRetries(options.provider, requestMessages, requestTools, counting, 3);
     } catch (error) {
+      // Provider-side context overflow: compact much harder and retry once
+      // before giving up (failover rules below still apply afterwards).
+      const message = (error as Error).message;
+      const contextOverflow =
+        /context|maximum.{0,20}length|too many tokens|input.{0,20}long|prompt.{0,20}long/i.test(message);
+      if (
+        contextOverflow &&
+        !overflowRetried &&
+        requestMessages.length > 4
+      ) {
+        overflowRetried = true;
+        render.onInfo("provider reported a context overflow; compacting aggressively and retrying");
+        const forced = compactMessages(requestMessages, 24_000);
+        requestMessages.length = 0;
+        requestMessages.push(...forced.messages);
+        return streamChat(options.provider, requestMessages, requestTools, onDelta, {
+          temperature: options.temperature,
+          signal: options.signal,
+        });
+      }
       if (emitted > 0 || !options.fallbackProvider) throw error;
       render.onInfo(
         `provider '${options.provider.id}' failed (${(error as Error).message.split("\n")[0]}); failing over to '${options.fallbackProvider.id}'`,
