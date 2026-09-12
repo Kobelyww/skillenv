@@ -92,6 +92,12 @@ describe("runner", () => {
 
   it("reports missing commands clearly", () => {
     const envRoot = mkdtempSync(path.join(tmpdir(), "runner-missing-"));
+    if (process.platform === "win32") {
+      // The ENOENT shell fallback lets cmd.exe print its own "not recognized"
+      // message and return a non-zero exit code.
+      expect(runCommand(envRoot, "codex", ["definitely-missing-binary-xyz"])).not.toBe(0);
+      return;
+    }
     expect(() => runCommand(envRoot, "codex", ["definitely-missing-binary-xyz"])).toThrow(
       "command not found",
     );
