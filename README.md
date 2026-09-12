@@ -123,6 +123,9 @@ the OpenAI-compatible chat protocol, so every major provider works:
 export DEEPSEEK_API_KEY=sk-...
 skillenv agent research -p deepseek -m deepseek-chat --dir ~/my-project
 
+export ANTHROPIC_API_KEY=sk-ant-...      # Claude (native Messages protocol)
+skillenv agent research -p anthropic -m claude-sonnet-4-5 --dir ~/paper
+
 export NOUS_API_KEY=...                 # Nous Hermes
 skillenv agent research -p nous --dir ~/paper
 
@@ -225,13 +228,15 @@ skillenv export <env>
 skillenv doctor <env>
 skillenv diff <a> <b>
 skillenv run <env> [-- command...]
-skillenv agent <env> [prompt] [-p provider] [-m model] [-s session] [-c] [-q] [--dir] [--skills]
+skillenv agent <env> [prompt] [-p provider] [-m model] [--fallback-provider id] [--tools names]
+                            [--confirm-shell] [-s session] [-c] [-q] [--dir path] [--skills names]
+skillenv agent-eval <suite.yaml> <env> [--report report.json] [--keep-workdirs]
 skillenv env list | env info <env> | env rename <old> <new>
 skillenv preset list
 skillenv registry list | show | search | add | sources | update | publish
 skillenv adapter list | codex | claude-code | pi | gemini
 skillenv plugin install | plugin list
-skillenv session list | session show
+skillenv session list | show | export <env> <id> [-o file]
 ```
 
 ## Library usage

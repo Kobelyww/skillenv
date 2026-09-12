@@ -4,6 +4,9 @@
 
 ### Added
 
+- Anthropic provider: native Messages protocol support (Claude models) with
+  full tool streaming — request/response translated to the agent's
+  OpenAI-shaped internal loop.
 - Provider reliability for the agent: transient failures (network errors,
   HTTP 429/5xx) retry with exponential backoff; `--fallback-provider` /
   `--fallback-model` move the request to a second provider when the primary

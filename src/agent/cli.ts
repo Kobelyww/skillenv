@@ -290,7 +290,8 @@ async function runAgentCommand(
       fail((error as Error).message);
     }
   } else if (options.continueSession) {
-    const latest = listSessions(env.root).at(-1);
+    // Same-second sessions share a filename prefix; pick by updated_at.
+    const latest = listSessions(env.root).sort((a, b) => b.updated_at.localeCompare(a.updated_at))[0];
     if (!latest) fail("no previous session to continue");
     session = latest as AgentSession;
   } else {

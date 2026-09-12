@@ -7,11 +7,15 @@ agent knows how to do.
 
 ## Providers
 
-All providers speak `POST {baseUrl}/chat/completions` with `stream: true`.
+All providers speak the OpenAI-compatible `POST {baseUrl}/chat/completions`
+with `stream: true`, except `anthropic`, which uses the Anthropic Messages
+protocol (`/v1/messages` with `x-api-key`, `system` as a top-level parameter,
+and `input_schema` tools) — translated transparently by the harness.
 
 | Provider | Base URL (default) | API key env | Model env | Default model |
 |---|---|---|---|---|
 | `deepseek` | `https://api.deepseek.com/v1` | `DEEPSEEK_API_KEY` | `DEEPSEEK_MODEL` | `deepseek-chat` |
+| `anthropic` | `https://api.anthropic.com/v1` | `ANTHROPIC_API_KEY` | `ANTHROPIC_MODEL` | `claude-sonnet-4-5` |
 | `nous` | `https://inference-api.nousresearch.com/v1` | `NOUS_API_KEY` | `HERMES_MODEL` | `Hermes-4-405B` |
 | `glm` | `https://open.bigmodel.cn/api/paas/v4` | `GLM_API_KEY` | `GLM_MODEL` | `glm-4.6` |
 | `openai` | `OPENAI_BASE_URL` (else api.openai.com/v1) | `OPENAI_API_KEY` | `OPENAI_MODEL` | `gpt-5.2` |

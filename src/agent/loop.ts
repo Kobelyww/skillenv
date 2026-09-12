@@ -5,7 +5,7 @@ import { readLock } from "../lock.js";
 import { readSkillMeta, SKILL_FILE } from "../skill.js";
 import type { AgentRenderEvents } from "./render.js";
 import {
-  chatCompletionStream,
+  streamChat,
   ProviderHttpError,
   type ChatMessage,
   type CompletionResult,
@@ -226,7 +226,7 @@ export async function runAgentTurn(
     let lastError: unknown;
     for (let attempt = 1; attempt <= attempts; attempt++) {
       try {
-        return await chatCompletionStream(provider, requestMessages, requestTools, onDelta, {
+        return await streamChat(provider, requestMessages, requestTools, onDelta, {
           temperature: options.temperature,
           signal: options.signal,
         });

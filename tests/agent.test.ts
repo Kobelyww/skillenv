@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
 import http from "node:http";
-import { chatCompletionStream, resolveProvider, type ResolvedProvider } from "../src/agent/providers.js";
+import { anthropicChatCompletionStream, chatCompletionStream, resolveProvider, type ResolvedProvider } from "../src/agent/providers.js";
 import { defaultTools, executeTool, toolSchemas } from "../src/agent/tools.js";
 import { buildSystemPrompt, compactMessages, COMPACT_PLACEHOLDER, presentSkillNames, runAgentTurn } from "../src/agent/loop.js";
 import { createSession, listSessions, loadSession, saveSession } from "../src/agent/session.js";
@@ -431,6 +431,62 @@ describe("agent loop", () => {
     // Budget disabled.
     const disabled = compactMessages(messages, 0);
     expect(disabled.compacted).toBe(false);
+  });
+
+  it("speaks the Anthropic Messages protocol when provider is anthropic", async () => {
+    const env = createEnv("anthropic-env", HOME);
+    let captured: { url: string; headers: Record<string, unknown>; body: Record<string, unknown> } | null = null;
+    const server = http.createServer((req, res) => {
+      let body = "";
+      req.on("data", (c) => (body += c));
+      req.on("end", () => {
+        captured = {
+          url: req.url ?? "",
+          headers: { apiKey: req.headers["x-api-key"], version: req.headers["anthropic-version"] },
+          body: JSON.parse(body),
+        };
+        const events = [
+          'event: message_start\ndata: {"type":"message_start","message":{"usage":{"input_tokens":11}}}',
+          'event: content_block_start\ndata: {"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"toolu_1","name":"list_dir"}}',
+          'event: content_block_delta\ndata: {"type":"input_json_delta","index":0,"partial_json":"{}"}',
+          'event: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"tool_use"},"usage":{"output_tokens":7}}',
+        ];
+        res.writeHead(200, { "Content-Type": "text/event-stream" });
+        for (const line of events) res.write(`${line}\n\n`);
+        res.end("data: [DONE]\n\n");
+      });
+    });
+    servers.push(server);
+    const url = await new Promise<string>((resolve) => {
+      server.listen(0, "127.0.0.1", () => resolve(`http://127.0.0.1:${(server.address() as { port: number }).port}/v1`));
+    });
+    const provider: ResolvedProvider = { id: "anthropic", displayName: "Anthropic", baseUrl: url, apiKey: "sk-ant-test", model: "claude-test" };
+    const messages: ChatMessage[] = [
+      { role: "system", content: "be brief" },
+      { role: "user", content: "list it" },
+    ];
+    const result = await anthropicChatCompletionStream(provider, messages, toolSchemas(defaultTools()), () => {});
+    expect(result.toolCalls).toEqual([
+      { id: "toolu_1", type: "function", function: { name: "list_dir", arguments: "{}" } },
+    ]);
+    expect(result.finishReason).toBe("tool_calls");
+    expect(result.usage).toEqual({ prompt_tokens: 11, completion_tokens: 7 });
+    const request = captured as unknown as NonNullable<typeof captured>;
+    expect(request.url).toBe("/v1/messages");
+    expect(request.headers.apiKey).toBe("sk-ant-test");
+    expect(request.body.system).toBe("be brief");
+    expect(request.body.model).toBe("claude-test");
+    const tools = request.body.tools as { name: string; input_schema: unknown }[];
+    expect(tools.map((t) => t.name)).toContain("read_file");
+    expect(tools[0]?.input_schema).toBeDefined();
+  });
+
+  it("resolves the anthropic preset from ANTHROPIC_API_KEY", () => {
+    process.env.ANTHROPIC_API_KEY = "k";
+    delete process.env.ANTHROPIC_MODEL;
+    const provider = resolveProvider({ provider: "anthropic" });
+    expect(provider.baseUrl).toBe("https://api.anthropic.com/v1");
+    expect(provider.model).toBe("claude-sonnet-4-5");
   });
 
   it("retries transient 5xx with backoff before succeeding", async () => {
