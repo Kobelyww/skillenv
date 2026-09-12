@@ -266,7 +266,8 @@ version (not simulated):
 - **Real GitHub installs** from this repository and from
   `openai/skills` (zipball download → subtree copy → checksum lock).
 - **Agent evaluation suites run live** (`agent-eval`, DeepSeek): 2/2 cases
-  passed with tool-sequence and file assertions.
+  passed with tool-sequence and file assertions, plus content assertions
+  (`agent-contains`) verified against live answers.
 - **Self-hosting**: `env rename` and the eval `agent-contains` expectation
   were implemented by skillenv's own agent on a copy of this repository, then
   reviewed, tested, and adopted (see git history).

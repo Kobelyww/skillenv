@@ -1,9 +1,11 @@
 # Changelog
 
-## Unreleased
+## 2.1.0 (2026-09-12)
 
 ### Added
 
+- Parallel tool execution: same-turn tool calls run concurrently with results
+  re-joined in model order.
 - Anthropic provider: native Messages protocol support (Claude models) with
   full tool streaming — request/response translated to the agent's
   OpenAI-shaped internal loop.
