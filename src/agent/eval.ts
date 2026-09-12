@@ -4,13 +4,16 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { parse } from "yaml";
 import { runAgentTurn } from "./loop.js";
-import type { ChatMessage, ResolvedProvider } from "./providers.js";
+import { resolveProvider, type ChatMessage, type ResolvedProvider } from "./providers.js";
 import type { AgentRenderEvents } from "./render.js";
 
 /** One evaluation case: a prompt plus assertions about what the agent did. */
 export interface EvalCase {
   name: string;
   prompt: string;
+  /** Per-case provider override (A/B model comparison); defaults to the run-level provider. */
+  provider?: string;
+  model?: string;
   maxIterations?: number;
   expect: {
     /** Tool names that must appear in the turn (in any order). */
@@ -38,6 +41,8 @@ export interface EvalCaseResult {
   failures: string[];
   toolNames: string[];
   iterations: number;
+  provider: string;
+  model: string;
 }
 
 export interface EvalReport {
@@ -79,6 +84,8 @@ export function loadEvalSuite(file: string): EvalSuite {
     return {
       name,
       prompt,
+      provider: typeof entry.provider === "string" ? entry.provider : undefined,
+      model: typeof entry.model === "string" ? entry.model : undefined,
       maxIterations: typeof entry["max-iterations"] === "number" ? entry["max-iterations"] : undefined,
       expect: {
         toolsUsed: stringList(expect["tools-used"]),
@@ -124,12 +131,17 @@ export async function runEvalSuite(suite: EvalSuite, options: RunEvalOptions): P
       let toolNames: string[] = [];
       let iterations = 0;
 
+      let caseProvider = options.provider;
+      if (evalCase.provider) {
+        caseProvider = resolveProvider({ provider: evalCase.provider, model: evalCase.model });
+      }
+
       const messages: ChatMessage[] = [{ role: "user", content: evalCase.prompt }];
       const result = await runAgentTurn(
         {
           envRoot: options.envRoot,
           envName: options.envName,
-          provider: options.provider,
+          provider: caseProvider,
           fallbackProvider: options.fallbackProvider,
           workdir: caseDir,
           maxIterations: evalCase.maxIterations,
@@ -174,7 +186,15 @@ export async function runEvalSuite(suite: EvalSuite, options: RunEvalOptions): P
         }
       }
 
-      results.push({ name: evalCase.name, passed: failures.length === 0, failures, toolNames, iterations });
+      results.push({
+        name: evalCase.name,
+        passed: failures.length === 0,
+        failures,
+        toolNames,
+        iterations,
+        provider: caseProvider.id,
+        model: caseProvider.model,
+      });
     }
   } finally {
     if (options.keepWorkdirs !== true) {

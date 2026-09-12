@@ -29,6 +29,8 @@
   `examples/suites/coding.yaml`).
 - Coverage tooling (@vitest/coverage-v8) and unit tests for rendering,
   scaffolds, runner, skill frontmatter, and session markdown export.
+- Per-case provider overrides in eval suites (`provider:`/`model:` on a case)
+  for A/B model comparison.
 - Eval `agent-contains` expectation: assert (case-insensitive) that the
   agent's final answer contains given strings.
 - `skillenv session export <env> <id> [-o file]`: Markdown transcript export.

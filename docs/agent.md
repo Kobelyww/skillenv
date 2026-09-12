@@ -132,6 +132,16 @@ cases:
 skillenv agent-eval examples/suites/coding.yaml my-env --report report.json
 ```
 
+A case may override the provider for A/B model comparison:
+
+```yaml
+  - name: same-task-on-claude
+    prompt: >-
+      Create add.py ...
+    provider: anthropic
+    model: claude-sonnet-4-5
+```
+
 Exit code is non-zero when any case fails, so the suite gates CI the same way
 `pytest` does. `--keep-workdirs` preserves each case directory for
 inspection. Evaluation runs use a real provider (they exercise the model);

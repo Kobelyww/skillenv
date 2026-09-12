@@ -108,3 +108,48 @@ describe("runner", () => {
     expect(() => runCommand(envRoot, "codex", [])).toThrow("cannot be empty");
   });
 });
+
+describe("providerReadiness", () => {
+  it("reports readiness for every built-in provider", async () => {
+    const { providerReadiness } = await import("../src/inspect.js");
+    process.env.DEEPSEEK_API_KEY = "x";
+    delete process.env.NOUS_API_KEY;
+    delete process.env.MODELARTS_API_KEY;
+    delete process.env.MODELARTS_BASE_URL;
+    const readiness = providerReadiness();
+    const byId = new Map(readiness.map((entry) => [entry.id, entry]));
+    expect(byId.get("deepseek")?.ready).toBe(true);
+    expect(byId.get("nous")?.ready).toBe(false);
+    expect(byId.get("nous")?.missing).toBe("NOUS_API_KEY");
+    expect(byId.get("ollama")?.ready).toBe(true); // no key required
+    const modelarts = byId.get("modelarts");
+    expect(modelarts?.ready).toBe(false);
+    expect(modelarts?.missing).toContain("MODELARTS_API_KEY");
+    expect(modelarts?.missing).toContain("MODELARTS_BASE_URL");
+  });
+});
+
+describe("installGitHubSkill force path", () => {
+  it("overwrites an existing install with force", async () => {
+    const { installGitHubSkill, parseGitHubSource } = await import("../src/install.js");
+    const { createEnv } = await import("../src/env.js");
+    const env = createEnv("gh-force", HOME);
+    const source = parseGitHubSource("github:o/r/overwritable@v1");
+    const downloader = async (_source: unknown, destination: string) => {
+      writeFileSync(path.join(destination, "SKILL.md"), "---\nname: overwritable\n---\nv1", "utf8");
+    };
+    await installGitHubSkill(env.root, source, false, downloader);
+    const skillFile = path.join(env.root, "skills", "overwritable", "SKILL.md");
+    expect(readFileSync(skillFile, "utf8")).toContain("v1");
+    // Second install without force errors; with force replaces content.
+    await expect(
+      installGitHubSkill(env.root, source, false, async (_s, d) => {
+        writeFileSync(path.join(d, "SKILL.md"), "v2", "utf8");
+      }),
+    ).rejects.toThrow("already installed");
+    await installGitHubSkill(env.root, source, true, async (_s, d) => {
+      writeFileSync(path.join(d, "SKILL.md"), "---\nname: overwritable\n---\nv2", "utf8");
+    });
+    expect(readFileSync(skillFile, "utf8")).toContain("v2");
+  });
+});

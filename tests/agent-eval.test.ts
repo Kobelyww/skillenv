@@ -207,6 +207,58 @@ describe("runEvalSuite", () => {
     expect(bad?.failures).toEqual(["expected final answer to contain 'goodbye'"]);
   });
 
+  it("supports per-case provider overrides for A/B comparison", async () => {
+    const env = createEnv("ab-env", HOME);
+    const server = http.createServer((req, res) => {
+      let body = "";
+      req.on("data", (c) => (body += c));
+      req.on("end", () => {
+        const parsed = JSON.parse(body) as { messages: { role: string }[] };
+        res.writeHead(200, { "Content-Type": "text/event-stream" });
+        if (parsed.messages.some((m) => m.role === "tool")) {
+          res.write(`${chunk({ content: "file written." }, "stop")}\n\n`);
+        } else {
+          res.write(
+            `${chunk({ tool_calls: [{ index: 0, id: "w1", function: { name: "write_file", arguments: JSON.stringify({ path: "out.txt", content: "data" }) } }] }, "tool_calls")}\n\n`,
+          );
+        }
+        res.end("data: [DONE]\n\n");
+      });
+    });
+    servers.push(server);
+    const url = await new Promise<string>((resolve) => {
+      server.listen(0, "127.0.0.1", () => resolve(`http://127.0.0.1:${(server.address() as { port: number }).port}/v1`));
+    });
+    // The ollama preset resolves its base URL from OLLAMA_BASE_URL, so the
+    // per-case override points at the mock without an API key.
+    process.env.OLLAMA_BASE_URL = url;
+    process.env.OLLAMA_MODEL = "mock-ab";
+    try {
+      const suite: EvalSuite = {
+        name: "ab-suite",
+        cases: [
+          { name: "default-case", prompt: "write the file", expect: { toolsUsed: ["write_file"] } },
+          { name: "ollama-case", prompt: "write the file", provider: "ollama", model: "mock-ab", expect: { toolsUsed: ["write_file"] } },
+        ],
+      };
+      const provider: ResolvedProvider = { id: "mock", displayName: "Mock", baseUrl: url, apiKey: "", model: "m" };
+      const report = await runEvalSuite(suite, {
+        envRoot: env.root,
+        envName: "ab-env",
+        provider,
+        workdir: mkdtempSync(path.join(tmpdir(), "ab-run-")),
+        render: { onTextDelta: () => {}, onTurnStart: () => {}, onToolCall: () => {}, onToolResult: () => {}, onInfo: () => {} },
+      });
+      expect(report.results[0]?.provider).toBe("mock");
+      expect(report.results[1]?.provider).toBe("ollama");
+      expect(report.results[1]?.model).toBe("mock-ab");
+      expect(report.passed).toBe(2);
+    } finally {
+      delete process.env.OLLAMA_BASE_URL;
+      delete process.env.OLLAMA_MODEL;
+    }
+  });
+
   it("chatCompletionStream stays importable for live eval runs", () => {
     expect(typeof chatCompletionStream).toBe("function");
   });
