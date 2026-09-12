@@ -375,8 +375,19 @@ registryApp
   .description("Refresh configured registry caches.")
   .action(async () => {
     try {
-      const count = await updateRegistryCache(defaultHome());
-      process.stdout.write(`updated ${count} registry source${count === 1 ? "" : "s"}\n`);
+      const outcome = await updateRegistryCache(defaultHome());
+      for (const name of outcome.updated) {
+        process.stdout.write(`updated ${name}\n`);
+      }
+      for (const failure of outcome.failed) {
+        process.stderr.write(`${pc.yellow("warning:")} source '${failure.name}' failed: ${failure.error}\n`);
+      }
+      process.stdout.write(
+        `updated ${outcome.updated.length} registry source${outcome.updated.length === 1 ? "" : "s"}${outcome.failed.length > 0 ? `, ${outcome.failed.length} failed` : ""}\n`,
+      );
+      if (outcome.updated.length === 0 && outcome.failed.length > 0) {
+        process.exit(1);
+      }
     } catch (error) {
       fail((error as Error).message);
     }

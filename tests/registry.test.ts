@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
@@ -53,7 +53,15 @@ describe("user registry sources and cache", () => {
     addRegistrySource("team", remoteFile, home);
     expect(listRegistrySources(home)).toEqual([{ name: "team", url: remoteFile }]);
 
-    expect(await updateRegistryCache(home)).toBe(1);
+    // A broken source degrades to a warning; good sources still update.
+    addRegistrySource("broken", "/nonexistent/registry-xyz.json", home);
+    const outcome = await updateRegistryCache(home);
+    expect(outcome.updated).toEqual(["team"]);
+    expect(outcome.failed).toHaveLength(1);
+    expect(outcome.failed[0]?.name).toBe("broken");
+
+    rmSync(path.join(home, "registry-cache"), { recursive: true, force: true });
+    expect((await updateRegistryCache(home)).updated).toEqual(["team"]);
     const skills = listRegistrySkills(home);
     const teamLint = skills.find((skill) => skill.name === "team-lint");
     expect(teamLint?.versions?.["0.1.0"]?.source).toBe("local:/team/lint");
@@ -64,9 +72,10 @@ describe("user registry sources and cache", () => {
     expect(getRegistrySkill("pdf", home).description).toBe("Overridden PDF");
     expect(() => getRegistrySkill("nope", home)).toThrow("registry skill not found: nope");
 
-    // Re-adding replaces the source.
+    // Re-adding replaces the source (broken remains until removed).
     addRegistrySource("team", remoteFile, home);
-    expect(listRegistrySources(home)).toHaveLength(1);
+    expect(listRegistrySources(home).filter((source) => source.name === "team")).toHaveLength(1);
+    expect(listRegistrySources(home)).toHaveLength(2);
   });
 });
 

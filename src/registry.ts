@@ -87,23 +87,37 @@ export function listRegistrySources(home: string): RegistrySource[] {
 export function addRegistrySource(name: string, url: string, home: string): void {
   const file = registriesPath(home);
   mkdirSync(path.dirname(file), { recursive: true });
+  // File sources are stored absolute so `registry update` works from any cwd.
+  const asPath = url.replace(/^~(?=\/|$)/, process.env.HOME ?? "");
+  if (!/^https?:\/\//.test(url) && path.isAbsolute(asPath) === false && existsSync(asPath)) {
+    url = path.resolve(asPath);
+  }
   const sources = [...listRegistrySources(home).filter((source) => source.name !== name), { name, url }].sort(
     (a, b) => a.name.localeCompare(b.name),
   );
   writeFileSync(file, `${JSON.stringify({ version: 1, registries: sources }, null, 2)}\n`, "utf8");
 }
 
-/** Fetch every configured source (file path or URL) into the registry cache. */
-export async function updateRegistryCache(home: string): Promise<number> {
+export interface RegistryUpdateOutcome {
+  updated: string[];
+  failed: { name: string; error: string }[];
+}
+
+/** Fetch every configured source (file path or URL) into the registry cache. One bad source does not abort the rest. */
+export async function updateRegistryCache(home: string): Promise<RegistryUpdateOutcome> {
   const cache = registryCacheDir(home);
   mkdirSync(cache, { recursive: true });
-  let updated = 0;
+  const outcome: RegistryUpdateOutcome = { updated: [], failed: [] };
   for (const source of listRegistrySources(home)) {
-    const payload = await fetchRegistryPayload(source.url);
-    writeFileSync(path.join(cache, `${source.name}.json`), `${JSON.stringify(payload, null, 2)}\n`, "utf8");
-    updated += 1;
+    try {
+      const payload = await fetchRegistryPayload(source.url);
+      writeFileSync(path.join(cache, `${source.name}.json`), `${JSON.stringify(payload, null, 2)}\n`, "utf8");
+      outcome.updated.push(source.name);
+    } catch (error) {
+      outcome.failed.push({ name: source.name, error: (error as Error).message });
+    }
   }
-  return updated;
+  return outcome;
 }
 
 async function fetchRegistryPayload(url: string): Promise<RegistryPayload> {

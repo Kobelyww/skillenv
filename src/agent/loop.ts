@@ -27,6 +27,8 @@ export interface AgentOptions {
   workdir: string;
   /** Skill names to inline fully in the system prompt (others are listed + on-demand). */
   inlineSkills?: string[];
+  /** Extra instructions appended verbatim to the system prompt. */
+  systemExtra?: string;
   maxIterations?: number;
   temperature?: number;
   maxTokens?: number;
@@ -144,6 +146,9 @@ export function buildSystemPrompt(options: AgentOptions): string {
   const inline = inlineSkillText(options);
   if (inline.length > 0) {
     lines.push("", "# Inlined skills", inline);
+  }
+  if (options.systemExtra && options.systemExtra.trim().length > 0) {
+    lines.push("", "# Additional instructions", options.systemExtra.trim());
   }
   return lines.join("\n");
 }
@@ -319,6 +324,9 @@ export async function runAgentTurn(
     messages.push(assistantMessage);
 
     if (completion.toolCalls.length === 0) {
+      if (completion.finishReason === "max_tokens") {
+        render.onInfo("warning: the model hit its output token limit; consider --max-tokens");
+      }
       return { content: completion.content, toolCalls: totalToolCalls, toolNames, iterations: iteration, usage };
     }
 

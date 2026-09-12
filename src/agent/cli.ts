@@ -52,6 +52,7 @@ interface AgentCliOptions {
   tools?: string;
   dir?: string;
   skills?: string;
+  systemExtra?: string;
   session?: string;
   continueSession?: boolean;
   confirmShell?: boolean;
@@ -78,6 +79,7 @@ export function registerAgentCommands(program: Command): void {
     .option("--confirm-shell", "Ask before every shell command (interactive terminals only).", false)
     .option("--dir <path>", "Working directory for tools (default: current directory).")
     .option("--skills <names>", "Comma-separated skill names to inline into the system prompt.")
+    .option("--system-extra <text>", "Extra instructions appended to the agent system prompt.")
     .option("-s, --session <id>", "Reuse an existing session.")
     .option("-c, --continue", "Continue the most recent session.", false)
     .option("-q, --quiet", "Suppress tool rendering (assistant text only).", false)
@@ -314,6 +316,7 @@ async function runAgentCommand(
     confirmShell,
     workdir,
     inlineSkills,
+    systemExtra: options.systemExtra,
     maxIterations,
     temperature,
     maxTokens,
