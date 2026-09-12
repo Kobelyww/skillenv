@@ -1,0 +1,27 @@
+# A/B comparison: run the same task on two providers and compare outcomes.
+# Requires both providers' credentials in the environment.
+name: provider-ab-compare
+cases:
+  - name: task-on-deepseek
+    prompt: >-
+      Create palindrome.py: a Python 3 script that reads a word from argv and
+      prints "yes" if it is a palindrome (case-insensitive) else "no". Add a
+      unittest suite and run it.
+    provider: deepseek
+    max-iterations: 12
+    expect:
+      tools-used: [write_file, run_command]
+      files-exist: [palindrome.py]
+      command: ["python3", "test_palindrome.py"]
+  - name: task-on-claude
+    prompt: >-
+      Create palindrome.py: a Python 3 script that reads a word from argv and
+      prints "yes" if it is a palindrome (case-insensitive) else "no". Add a
+      unittest suite and run it.
+    provider: anthropic
+    model: claude-sonnet-4-5
+    max-iterations: 12
+    expect:
+      tools-used: [write_file, run_command]
+      files-exist: [palindrome.py]
+      command: ["python3", "test_palindrome.py"]

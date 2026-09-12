@@ -341,6 +341,9 @@ const runCommandTool: ToolContext2 = {
       context.commandTimeoutMs ?? 300_000,
     );
     const cwd = resolveIn(context, args.cwd);
+    if (!statSync(cwd, { throwIfNoEntry: false })?.isDirectory()) {
+      return { ok: false, output: `working directory does not exist: ${cwd}` };
+    }
     const isWindows = process.platform === "win32";
     const result = spawnSync(isWindows ? "cmd" : "sh", [isWindows ? "/c" : "-c", command], {
       cwd,
