@@ -214,9 +214,18 @@ function safeParse(value: string): SkillSpec {
   }
 }
 
-/** True when the spec is a bare name (optionally with range), not a source. */
+/**
+ * True when the spec is a bare name (optionally with range), not a source.
+ * Windows-style paths (`C:\...`, `dir\skill`) count as sources.
+ */
 export function isNameSpec(value: string): boolean {
-  return !value.startsWith("github:") && !value.startsWith("local:") && !value.includes("/");
+  return (
+    !value.startsWith("github:") &&
+    !value.startsWith("local:") &&
+    !value.includes("/") &&
+    !value.includes("\\") &&
+    !/^[a-zA-Z]:/.test(value)
+  );
 }
 
 export { validRange as isValidRange };

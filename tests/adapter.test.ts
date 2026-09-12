@@ -1,3 +1,4 @@
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { ADAPTERS, adapterCommand, buildAdapterEnv, getAdapter } from "../src/adapter.js";
 import { getPreset, listPresets, PRESETS } from "../src/preset.js";
@@ -12,17 +13,20 @@ describe("adapters", () => {
   });
 
   it("builds generic + adapter env vars", () => {
-    const vars = buildAdapterEnv("/home/user/.skillenv/envs/research", "codex");
-    expect(vars.CODEX_HOME).toBe("/home/user/.skillenv/envs/research");
-    expect(vars.SKILLENV_ENV).toBe("research");
-    expect(vars.SKILLENV_SKILLS_DIR).toBe("/home/user/.skillenv/envs/research/skills");
+    const root = path.resolve("/home/user/.skillenv/envs/research");
+    const vars = buildAdapterEnv(root, "codex");
+    expect(vars.CODEX_HOME).toBe(root);
+    expect(vars.SKILLENV_ENV).toBe(path.basename(root));
+    expect(vars.SKILLENV_SKILLS_DIR).toBe(path.join(root, "skills"));
 
-    const claudeVars = buildAdapterEnv("/x/y/claude-env", "claude");
-    expect(claudeVars.CLAUDE_CONFIG_DIR).toBe("/x/y/claude-env");
+    const claudeRoot = path.resolve("/x/y/claude-env");
+    const claudeVars = buildAdapterEnv(claudeRoot, "claude");
+    expect(claudeVars.CLAUDE_CONFIG_DIR).toBe(claudeRoot);
 
-    const genericVars = buildAdapterEnv("/x/y/generic", "generic");
+    const genericRoot = path.resolve("/x/y/generic");
+    const genericVars = buildAdapterEnv(genericRoot, "generic");
     expect(genericVars.CODEX_HOME).toBeUndefined();
-    expect(genericVars.SKILLENV_ENV_ROOT).toBe("/x/y/generic");
+    expect(genericVars.SKILLENV_ENV_ROOT).toBe(genericRoot);
   });
 
   it("resolves default commands with override support", () => {

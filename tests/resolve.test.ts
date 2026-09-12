@@ -117,5 +117,7 @@ describe("isNameSpec", () => {
     expect(isNameSpec("github:o/r/pdf")).toBe(false);
     expect(isNameSpec("local:/tmp/pdf")).toBe(false);
     expect(isNameSpec("./skills/pdf")).toBe(false);
+    expect(isNameSpec("C:\\Users\\me\\skills\\pdf")).toBe(false);
+    expect(isNameSpec("skills\\pdf")).toBe(false);
   });
 });
