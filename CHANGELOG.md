@@ -27,10 +27,15 @@
   agent — per-case tool-sequence, file-existence, and exit-code assertions
   with JSON reports and CI-gating exit codes (see
   `examples/suites/coding.yaml`).
+- `pretest` builds dist so e2e tests always exercise the current code.
 - Coverage tooling (@vitest/coverage-v8) and unit tests for rendering,
   scaffolds, runner, skill frontmatter, and session markdown export.
 - Per-case provider overrides in eval suites (`provider:`/`model:` on a case)
   for A/B model comparison.
+- `agent-eval --case <name>` runs a single case; `--max-iterations` sets the
+  default cap for cases without their own.
+- `run_command` survives ENOBUFS: oversized output returns the captured
+  partial stdout with a truncation warning instead of failing.
 - Context-overflow resilience: provider "maximum context length" errors now
   trigger an aggressive compaction pass and a single retry before failing.
   (Also fixed: the pre-turn compaction result was computed but never applied
