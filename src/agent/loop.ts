@@ -330,11 +330,18 @@ export async function runAgentTurn(
       return { content: completion.content, toolCalls: totalToolCalls, toolNames, iterations: iteration, usage };
     }
 
-    for (const call of completion.toolCalls as ToolCall[]) {
-      totalToolCalls += 1;
+    const calls = completion.toolCalls as ToolCall[];
+    totalToolCalls += calls.length;
+    for (const call of calls) {
       toolNames.push(call.function.name);
       render.onToolCall(call.function.name, call.function.arguments);
-      const result = await executeTool(tools, context, call);
+    }
+    // Independent tool calls from the same turn run concurrently; results are
+    // re-joined in the model's original order so the transcript stays aligned
+    // with each tool_call id.
+    const results = await Promise.all(calls.map((call) => executeTool(tools, context, call)));
+    calls.forEach((call, index) => {
+      const result = results[index] as { ok: boolean; output: string };
       render.onToolResult(call.function.name, result.ok, result.output);
       messages.push({
         role: "tool",
@@ -342,7 +349,7 @@ export async function runAgentTurn(
         name: call.function.name,
         content: result.output,
       });
-    }
+    });
   }
 }
 

@@ -312,6 +312,56 @@ describe("agent loop", () => {
     expect(followUp.messages.some((m) => m.role === "tool")).toBe(true);
   });
 
+  it("executes parallel tool calls concurrently and re-joins in order", async () => {
+    const env = createEnv("parallel-env", HOME);
+    const started: string[] = [];
+    let overlapping = false;
+    const { url } = await startSseServer([
+      [
+        chunk({ tool_calls: [
+          { index: 0, id: "p1", function: { name: "run_command", arguments: JSON.stringify({ command: "sleep 0.3 && echo first-done" }) } },
+          { index: 1, id: "p2", function: { name: "run_command", arguments: JSON.stringify({ command: "echo second-done" }) } },
+        ] }, "tool_calls"),
+      ],
+      sse("both finished"),
+    ]);
+    const provider: ResolvedProvider = { id: "test", displayName: "Test", baseUrl: url, apiKey: "", model: "m" };
+    const toolResults: { name: string; output: string }[] = [];
+    const messages: ChatMessage[] = [{ role: "user", content: "run both" }];
+    const result = await runAgentTurn(
+      {
+        envRoot: env.root,
+        envName: "parallel-env",
+        provider,
+        workdir: HOME,
+        confirmShell: async (command) => {
+          started.push(command.slice(0, 12));
+          if (started.length === 2 && started[0]?.startsWith("sleep")) overlapping = true;
+          return true;
+        },
+      },
+      messages,
+      {
+        onTextDelta: () => {},
+        onTurnStart: () => {},
+        onToolCall: () => {},
+        onToolResult: (name, _ok, output) => toolResults.push({ name, output }),
+        onInfo: () => {},
+      },
+    );
+    expect(result.content).toBe("both finished");
+    expect(result.toolNames).toEqual(["run_command", "run_command"]);
+    // The slow first call ran concurrently with the fast second one: the
+    // second result arrived while the first was still sleeping.
+    expect(overlapping).toBe(true);
+    // Transcript order matches the model's tool_call order.
+    expect(toolResults[0]?.output).toContain("first-done");
+    expect(toolResults[1]?.output).toContain("second-done");
+    const toolMessages = messages.filter((m) => m.role === "tool");
+    expect(toolMessages[0]?.tool_call_id).toBe("p1");
+    expect(toolMessages[1]?.tool_call_id).toBe("p2");
+  });
+
   it("degrades gracefully at the iteration limit with a tool-less summary", async () => {    const env = createEnv("limit-env", HOME);
     // Smart mock: requests carrying `tools` get a tool call; the summary
     // request (no tools) gets the final content.
