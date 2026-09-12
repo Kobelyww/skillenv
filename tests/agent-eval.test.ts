@@ -207,6 +207,51 @@ describe("runEvalSuite", () => {
     expect(bad?.failures).toEqual(["expected final answer to contain 'goodbye'"]);
   });
 
+  it("runs a single case via onlyCase and errors on no match", async () => {
+    const env = createEnv("only-env", HOME);
+    const server = http.createServer((req, res) => {
+      let body = "";
+      req.on("data", (c) => (body += c));
+      req.on("end", () => {
+        const parsed = JSON.parse(body) as { messages: { role: string }[] };
+        res.writeHead(200, { "Content-Type": "text/event-stream" });
+        if (parsed.messages.some((m) => m.role === "tool")) {
+          res.write(`${chunk({ content: "file written." }, "stop")}\n\n`);
+        } else {
+          res.write(
+            `${chunk({ tool_calls: [{ index: 0, id: "w1", function: { name: "write_file", arguments: JSON.stringify({ path: "out.txt", content: "data" }) } }] }, "tool_calls")}\n\n`,
+          );
+        }
+        res.end("data: [DONE]\n\n");
+      });
+    });
+    servers.push(server);
+    const url = await new Promise<string>((resolve) => {
+      server.listen(0, "127.0.0.1", () => resolve(`http://127.0.0.1:${(server.address() as { port: number }).port}/v1`));
+    });
+    const provider: ResolvedProvider = { id: "mock", displayName: "Mock", baseUrl: url, apiKey: "", model: "m" };
+    const suite: EvalSuite = {
+      name: "only-suite",
+      cases: [
+        { name: "alpha", prompt: "write the file", expect: { toolsUsed: ["write_file"] } },
+        { name: "beta", prompt: "write the file", expect: { toolsUsed: ["write_file"] } },
+      ],
+    };
+    const render = { onTextDelta: () => {}, onTurnStart: () => {}, onToolCall: () => {}, onToolResult: () => {}, onInfo: () => {} };
+    const filtered = await runEvalSuite(suite, {
+      envRoot: env.root, envName: "only-env", provider, workdir: mkdtempSync(path.join(tmpdir(), "only-")),
+      onlyCase: "alpha", render,
+    });
+    expect(filtered.results.map((r) => r.name)).toEqual(["alpha"]);
+
+    await expect(
+      runEvalSuite(suite, {
+        envRoot: env.root, envName: "only-env", provider, workdir: mkdtempSync(path.join(tmpdir(), "only-")),
+        onlyCase: "gamma", render,
+      }),
+    ).rejects.toThrow("no case matches 'gamma'");
+  });
+
   it("supports per-case provider overrides for A/B comparison", async () => {
     const env = createEnv("ab-env", HOME);
     const server = http.createServer((req, res) => {

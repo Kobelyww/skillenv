@@ -43,6 +43,7 @@ interface EvalCliOptions {
   report?: string;
   keepWorkdirs?: boolean;
   maxIterations?: string;
+  case?: string;
 }
 
 interface AgentCliOptions {
@@ -108,6 +109,7 @@ export function registerAgentCommands(program: Command): void {
     .option("--report <file>", "Write a JSON report to this file.")
     .option("--keep-workdirs", "Keep per-case workdirs for inspection.", false)
     .option("--max-iterations <n>", "Default iteration cap for cases without their own.", "25")
+    .option("--case <name>", "Run only the case whose name contains this substring.")
     .action(async (suiteFile: string, envName: string, options: EvalCliOptions) => {
       const { loadEvalSuite, runEvalSuite } = await import("./eval.js");
       const env = mustGetEnv(envName);
@@ -151,6 +153,7 @@ export function registerAgentCommands(program: Command): void {
         keepWorkdirs: options.keepWorkdirs,
         render: terminalRender(),
         defaultMaxIterations: Math.max(1, Number.parseInt(options.maxIterations ?? "25", 10) || 25),
+        onlyCase: options.case,
       });
       for (const result of report.results) {
         const mark = result.passed ? pc.green("✓") : pc.red("✗");

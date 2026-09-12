@@ -110,6 +110,8 @@ export interface RunEvalOptions {
   compactChars?: number;
   /** Default iteration cap for cases that do not set their own. */
   defaultMaxIterations?: number;
+  /** Run only cases whose name contains this substring. */
+  onlyCase?: string;
 }
 
 /**
@@ -125,8 +127,14 @@ export async function runEvalSuite(suite: EvalSuite, options: RunEvalOptions): P
       ? path.join(options.workdir, `.eval-${Date.now()}`)
       : mkdtempSync(path.join(tmpdir(), "skillenv-eval-"));
 
+  const cases = options.onlyCase
+    ? suite.cases.filter((evalCase) => evalCase.name.includes(options.onlyCase as string))
+    : suite.cases;
+  if (cases.length === 0) {
+    throw new Error(`no case matches '${options.onlyCase}'; suite cases: ${suite.cases.map((c) => c.name).join(", ")}`);
+  }
   try {
-    for (const evalCase of suite.cases) {
+    for (const evalCase of cases) {
       const caseDir = path.join(suiteRoot, evalCase.name.replace(/[^a-zA-Z0-9_-]+/g, "-"));
       mkdirSync(caseDir, { recursive: true });
       const failures: string[] = [];
