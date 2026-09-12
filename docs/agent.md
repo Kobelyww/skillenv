@@ -145,6 +145,7 @@ cases:
 
 ```bash
 skillenv agent-eval examples/suites/coding.yaml my-env --report report.json
+skillenv agent-eval examples/suites/coding.yaml my-env --case implement-and-verify   # one case only
 ```
 
 A case may override the provider for A/B model comparison:
