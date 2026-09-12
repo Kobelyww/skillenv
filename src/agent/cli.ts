@@ -59,6 +59,7 @@ interface AgentCliOptions {
   quiet?: boolean;
   maxIterations?: string;
   maxTokens?: string;
+  compactChars?: string;
   temperature?: string;
 }
 
