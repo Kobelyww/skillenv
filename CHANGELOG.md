@@ -25,6 +25,8 @@
   agent — per-case tool-sequence, file-existence, and exit-code assertions
   with JSON reports and CI-gating exit codes (see
   `examples/suites/coding.yaml`).
+- Eval `agent-contains` expectation: assert (case-insensitive) that the
+  agent's final answer contains given strings.
 - `skillenv session export <env> <id> [-o file]`: Markdown transcript export.
 - `skillenv env rename <old> <new>`: move an environment and rewrite its
   manifest name, preserving skills, plugins, lock, and sessions.

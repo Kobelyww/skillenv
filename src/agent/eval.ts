@@ -21,6 +21,8 @@ export interface EvalCase {
     filesExist?: string[];
     /** Command run after the agent finishes; must exit 0. */
     command?: string[];
+    /** Strings that must appear (case-insensitive) in the agent's final answer. */
+    agentContains?: string[];
   };
 }
 
@@ -83,6 +85,7 @@ export function loadEvalSuite(file: string): EvalSuite {
         toolsForbidden: stringList(expect["tools-forbidden"]),
         filesExist: stringList(expect["files-exist"]),
         command: stringList(expect.command),
+        agentContains: stringList(expect["agent-contains"]),
       },
     };
   });
@@ -146,6 +149,11 @@ export async function runEvalSuite(suite: EvalSuite, options: RunEvalOptions): P
       for (const tool of evalCase.expect.toolsForbidden ?? []) {
         if (toolNames.includes(tool)) {
           failures.push(`tool '${tool}' was used but is forbidden`);
+        }
+      }
+      for (const text of evalCase.expect.agentContains ?? []) {
+        if (!result.content.toLowerCase().includes(text.toLowerCase())) {
+          failures.push(`expected final answer to contain '${text}'`);
         }
       }
       for (const file of evalCase.expect.filesExist ?? []) {

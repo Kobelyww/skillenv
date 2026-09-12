@@ -142,6 +142,71 @@ describe("runEvalSuite", () => {
     expect(entries.some((entry) => entry.startsWith(".eval-"))).toBe(true);
   });
 
+  it("agent-contains passes and fails correctly", async () => {
+    const env = createEnv("eval-env", HOME);
+    makeSkill(path.join(env.root, "skills"), "eval-skill", { description: "d" });
+
+    const server = http.createServer((req, res) => {
+      let body = "";
+      req.on("data", (c) => (body += c));
+      req.on("end", () => {
+        const parsed = JSON.parse(body) as { messages: { role: string; content: string | null }[] };
+        const last = parsed.messages.at(-1);
+        res.writeHead(200, { "Content-Type": "text/event-stream" });
+        if (last?.role === "user" && String(last.content).includes("say hello")) {
+          // Case A: final answer contains the expected text.
+          res.write(`${chunk({ content: "Hello there, all done." }, "stop")}\n\n`);
+        } else {
+          // Case B: final answer does not contain the expected text.
+          res.write(`${chunk({ content: "nothing to report." }, "stop")}\n\n`);
+        }
+        res.end("data: [DONE]\n\n");
+      });
+    });
+    servers.push(server);
+    const url = await new Promise<string>((resolve) => {
+      server.listen(0, "127.0.0.1", () => resolve(`http://127.0.0.1:${(server.address() as { port: number }).port}/v1`));
+    });
+    const provider: ResolvedProvider = { id: "mock", displayName: "Mock", baseUrl: url, apiKey: "", model: "m" };
+
+    const suite: EvalSuite = {
+      name: "agent-contains-suite",
+      cases: [
+        {
+          name: "contains-case",
+          prompt: "say hello",
+          expect: {
+            agentContains: ["HELLO"],
+          },
+        },
+        {
+          name: "missing-case",
+          prompt: "say something else",
+          expect: {
+            agentContains: ["goodbye"],
+          },
+        },
+      ],
+    };
+
+    const workdir = mkdtempSync(path.join(tmpdir(), "eval-run-"));
+    const report = await runEvalSuite(suite, {
+      envRoot: env.root,
+      envName: "eval-env",
+      provider,
+      workdir,
+      render: { onTextDelta: () => {}, onTurnStart: () => {}, onToolCall: () => {}, onToolResult: () => {}, onInfo: () => {} },
+    });
+
+    expect(report.total).toBe(2);
+    expect(report.passed).toBe(1);
+    const [good, bad] = report.results;
+    expect(good?.passed).toBe(true);
+    expect(good?.failures).toEqual([]);
+    expect(bad?.passed).toBe(false);
+    expect(bad?.failures).toEqual(["expected final answer to contain 'goodbye'"]);
+  });
+
   it("chatCompletionStream stays importable for live eval runs", () => {
     expect(typeof chatCompletionStream).toBe("function");
   });
