@@ -431,6 +431,13 @@ describe("agent loop", () => {
     // Budget disabled.
     const disabled = compactMessages(messages, 0);
     expect(disabled.compacted).toBe(false);
+
+    // The caller's transcript must never be mutated, including nested
+    // tool_call payloads.
+    const original = messages[2]?.tool_calls?.[0]?.function.arguments ?? "";
+    expect(original).toContain("command"); // sanity: fixture has the payload
+    compactMessages(messages, 10_000);
+    expect(messages[2]?.tool_calls?.[0]?.function.arguments).toBe(original);
   });
 
   it("speaks the Anthropic Messages protocol when provider is anthropic", async () => {

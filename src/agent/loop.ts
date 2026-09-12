@@ -71,7 +71,15 @@ export function compactMessages(
   const keepTail = Math.min(12, Math.max(2, Math.floor(messages.length / 3)));
   const firstUser = messages.findIndex((m) => m.role === "user");
   const compactableEnd = Math.max(0, messages.length - keepTail);
-  const out = messages.map((m) => ({ ...m }));
+  // Deep-copy tool_call payloads: compaction rewrites arguments in place and
+  // must never mutate the caller's conversation history.
+  const out = messages.map((m) => ({
+    ...m,
+    tool_calls: m.tool_calls?.map((call) => ({
+      ...call,
+      function: { ...call.function },
+    })),
+  }));
   let compacted = false;
 
   // Compact tool outputs first (they dominate size), then assistant turns,
