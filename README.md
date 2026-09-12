@@ -12,7 +12,7 @@ configuration — for **Codex**, **Claude Code**, **pi**, and any agent CLI.
 [![CI](https://github.com/Kobelyww/skillenv/actions/workflows/ci.yml/badge.svg)](../../actions)
 ![Node](https://img.shields.io/badge/Node-20%2B-green)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178c6)
-![Tests](https://img.shields.io/badge/tests-115%20passing-brightgreen)
+![Tests](https://img.shields.io/badge/tests-148%20passing-brightgreen)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
 
 </div>
@@ -288,7 +288,8 @@ version (not simulated):
 ```bash
 npm install
 npm run build       # tsup → dist/
-npm test            # vitest (115 tests incl. e2e CLI + mock provider)
+npm test            # vitest (148 tests incl. e2e CLI + mock provider)
+npm run lint        # eslint
 npm run typecheck   # tsc --noEmit
 npm run skillenv -- env list   # run the CLI from source
 ```
