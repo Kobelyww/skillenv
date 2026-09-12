@@ -67,7 +67,7 @@ export function registerAgentCommands(program: Command): void {
   program
     .command("agent <env>")
     .description(
-      "Run the built-in coding agent inside an environment. Providers: deepseek, nous (Hermes), glm, openai, ollama, modelarts.",
+      "Run the built-in coding agent inside an environment. Providers: deepseek, nous (Hermes), glm, openai, ollama, modelarts, anthropic.",
     )
     .option("-p, --provider <id>", "Provider preset (default: deepseek).")
     .option("-m, --model <model>", "Model name (defaults to the provider preset).")
