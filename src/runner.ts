@@ -22,6 +22,9 @@ export function runCommand(envRoot: string, adapter: string, command: string[]):
   const result = spawnSync(command[0] as string, command.slice(1), {
     env: buildRunEnv(envRoot, adapter, process.env as Record<string, string>),
     stdio: "inherit",
+    // On Windows, npm-installed agent CLIs are .cmd shims that spawnSync
+    // refuses to resolve without a shell.
+    shell: process.platform === "win32",
   });
   if (result.error) {
     const code = (result.error as NodeJS.ErrnoException).code;

@@ -404,6 +404,16 @@ const webFetchTool: ToolContext2 = {
       if (!response.ok) {
         return { ok: false, output: `HTTP ${response.status} ${response.statusText} for ${parsed}` };
       }
+      const contentType = (response.headers.get("content-type") ?? "").toLowerCase();
+      const textLike =
+        contentType.startsWith("text/") ||
+        contentType.includes("json") ||
+        contentType.includes("xml") ||
+        contentType.includes("javascript") ||
+        contentType.length === 0;
+      if (!textLike) {
+        return { ok: false, output: `refused non-text content-type: ${contentType || "unknown"} for ${parsed}` };
+      }
       const text = await response.text();
       return { ok: true, output: truncate(text.slice(0, 32_000), 32_000) };
     } catch (error) {

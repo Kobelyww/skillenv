@@ -1,4 +1,5 @@
 import { createInterface } from "node:readline/promises";
+import { writeFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import pc from "picocolors";
@@ -10,6 +11,7 @@ import {
   listSessions,
   loadSession,
   saveSession,
+  sessionToMarkdown,
   type AgentSession,
 } from "./session.js";
 import { endTurn, quietRender, terminalRender, type AgentRenderEvents } from "./render.js";
@@ -90,6 +92,26 @@ export function registerAgentCommands(program: Command): void {
         process.stdout.write(
           `${session.id}\t${session.provider}/${session.model}\t${session.messages.length} msgs\t${session.updated_at}\n`,
         );
+      }
+    });
+
+  sessionApp
+    .command("export <env> <id>")
+    .description("Export a session transcript as Markdown (default: stdout; --out writes a file).")
+    .option("-o, --out <file>", "Write to this file instead of stdout.")
+    .action((envName: string, id: string, options: { out?: string }) => {
+      const env = mustGetEnv(envName);
+      try {
+        const session = loadSession(env.root, id);
+        const markdown = sessionToMarkdown(session);
+        if (options.out) {
+          writeFileSync(path.resolve(options.out), markdown, "utf8");
+          process.stdout.write(`exported ${session.id} -> ${path.resolve(options.out)}\n`);
+        } else {
+          process.stdout.write(markdown);
+        }
+      } catch (error) {
+        fail((error as Error).message);
       }
     });
 

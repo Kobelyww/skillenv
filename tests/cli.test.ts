@@ -139,6 +139,43 @@ describe("CLI end-to-end", () => {
     expect(cli(["env", "rename", "ghost", "nope"]).status).not.toBe(0);
   });
 
+  it("session export writes markdown", () => {
+    // agent runs create sessions only with a provider; exercise the command's
+    // error path plus a fabricated session file end to end.
+    cli(["create", "export-sessions"]);
+    const sessionsDir = path.join(HOME, "envs", "export-sessions", "sessions");
+    writeFileSync(
+      path.join(sessionsDir, "agent-test.json"),
+      JSON.stringify({
+        id: "agent-test",
+        created_at: "2026-09-12T00:00:00Z",
+        updated_at: "2026-09-12T00:00:00Z",
+        provider: "deepseek",
+        model: "deepseek-chat",
+        env: "export-sessions",
+        messages: [
+          { role: "user", content: "hello" },
+          { role: "assistant", content: "hi there" },
+        ],
+      }),
+      "utf8",
+    );
+    const out = path.join(HOME, "export.md");
+    const result = cli(["session", "export", "export-sessions", "agent-test", "-o", out]);
+    expect(result.status).toBe(0);
+    expect(readFileSync(out, "utf8")).toContain("# agent session agent-test");
+    expect(readFileSync(out, "utf8")).toContain("hi there");
+    const stdout = cli(["session", "export", "export-sessions", "agent-test"]);
+    expect(stdout.stdout).toContain("## assistant");
+  });
+
+  (process.platform === "win32" ? it : it.skip)("run resolves npm .cmd shims on windows", () => {
+    cli(["create", "cmd-runner"]);
+    const result = cli(["run", "cmd-runner", "--", "npm", "--version"]);
+    expect(result.status).toBe(0);
+    expect(result.stdout).toMatch(/\d+\.\d+\.\d+/);
+  });
+
   it("unknown commands fail gracefully", () => {
     const result = cli(["definitely-not-a-command"]);
     expect(result.status).not.toBe(0);

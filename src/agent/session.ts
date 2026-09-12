@@ -70,3 +70,35 @@ export function listSessions(envRoot: string): AgentSession[] {
 export function lockSnapshot(lock: LockFile): Pick<LockFile, "version" | "skills"> {
   return { version: lock.version, skills: lock.skills };
 }
+
+/** Render a session transcript as readable Markdown. */
+export function sessionToMarkdown(session: AgentSession): string {
+  const lines: string[] = [
+    `# agent session ${session.id}`,
+    "",
+    `- env: ${session.env}`,
+    `- provider/model: ${session.provider}/${session.model}`,
+    `- created: ${session.created_at}`,
+    `- messages: ${session.messages.length}`,
+    "",
+  ];
+  for (const message of session.messages) {
+    if (message.role === "tool") {
+      lines.push(`## tool: ${message.name ?? ""}`, "", "```", (message.content ?? "").slice(0, 4000), "```", "");
+      continue;
+    }
+    if (message.role === "assistant" && message.tool_calls?.length) {
+      for (const call of message.tool_calls) {
+        lines.push(`## tool call: ${call.function.name}`, "", "```json", call.function.arguments.slice(0, 2000), "```", "");
+      }
+      if (message.content) {
+        lines.push(`## assistant`, "", message.content, "");
+      }
+      continue;
+    }
+    if (message.content) {
+      lines.push(`## ${message.role}`, "", message.content, "");
+    }
+  }
+  return lines.join("\n");
+}
