@@ -83,6 +83,7 @@ self-contained agent home**:
 | **Dependency resolution** | Skills can declare dependencies; skillenv intersects semver constraints across the graph, detects conflicts with full requirer chains, and installs topologically |
 | **Registry v2** | Bundled registry + your own file/HTTP registry sources with caching, search, and a `registry publish` validation flow |
 | **Built-in coding agent** | `skillenv agent` — a streaming tool-calling agent over any OpenAI-compatible provider (DeepSeek, Nous Hermes, GLM, OpenAI, Ollama, ModelArts MaaS) with 10 workspace tools and skill injection |
+| **Persistent memory** | `memory_read`/`memory_write` tools keep durable facts, decisions, and preferences per environment — the working agent starts every session with its accumulated context |
 | **Reproducibility** | `export` emits a manifest from the lock; `create -f` recreates the environment elsewhere; `doctor` verifies layout and checksums |
 
 ## Quick start
