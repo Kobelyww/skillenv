@@ -131,7 +131,9 @@ const editFileTool: ToolContext2 = {
       if (occurrences > 1) {
         return { ok: false, output: `old_string matches ${occurrences} times in ${file}; make it unique` };
       }
-      writeFileSync(file, text.replace(oldString, newString), "utf8");
+      // Function form: replacement strings containing $&, $1, … must be
+      // inserted literally, not expanded as replace patterns.
+      writeFileSync(file, text.replace(oldString, () => newString), "utf8");
       return { ok: true, output: `edited ${file}` };
     } catch (error) {
       return { ok: false, output: `cannot edit ${file}: ${(error as Error).message}` };

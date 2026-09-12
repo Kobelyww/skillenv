@@ -188,6 +188,29 @@ describe("tools", () => {
     expect(ambiguous.ok).toBe(false);
   });
 
+  it("edit_file inserts new_string literally (no dollar-pattern expansion)", async () => {
+    const tools = defaultTools();
+    const file = path.join(workdir, "regex.txt");
+    writeFileSync(file, "value = 1\n", "utf8");
+
+    // Build "  it("globs and greps", async () => {" at runtime so this test file itself never has to contain the
+    // sequence that String#replace would otherwise interpret.
+    const dollarAmp = String.fromCharCode(36) + "&";
+    const replacement = `= ${dollarAmp}2`;
+
+    const edit = await executeTool(tools, context, {
+      id: "edit-dollar",
+      type: "function",
+      function: {
+        name: "edit_file",
+        arguments: JSON.stringify({ path: "regex.txt", old_string: "= 1", new_string: replacement }),
+      },
+    });
+
+    expect(edit.ok).toBe(true);
+    expect(readFileSync(file, "utf8")).toBe(`value ${replacement}\n`);
+  });
+
   it("globs and greps", async () => {
     const tools = defaultTools();
     const glob = await executeTool(tools, context, {

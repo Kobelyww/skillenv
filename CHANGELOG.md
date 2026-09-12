@@ -34,6 +34,8 @@
   for A/B model comparison.
 - `agent-eval --case <name>` runs a single case; `--max-iterations` sets the
   default cap for cases without their own.
+- `edit_file` inserts `$&`-style replacement strings literally (found by an
+  independent agent code review; regression test first, then a one-line fix).
 - `run_command` survives ENOBUFS: oversized output returns the captured
   partial stdout with a truncation warning instead of failing.
 - Context-overflow resilience: provider "maximum context length" errors now
