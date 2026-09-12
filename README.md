@@ -305,6 +305,13 @@ The Python 1.x implementation was replaced by this TypeScript rewrite; its
 history remains in git (pre-merge `main` history). See also
 [SECURITY.md](SECURITY.md) for the agent's tool-safety posture.
 
+## Roadmap
+
+- **MCP integration**: mount external tools via MCP clients; expose the agent itself as an MCP server
+- **Subagent delegation**: parallel specialist contexts for large tasks
+- **Team backends**: PostgreSQL/Redis session storage for shared deployments
+- **Streaming tool arguments**: interleave tool execution with argument streaming
+
 ## License
 
 [MIT](LICENSE)
