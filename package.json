@@ -42,7 +42,7 @@
     "./package.json": "./package.json"
   },
   "scripts": {
-    "build": "tsup",
+    "build": "tsup --clean",
     "dev": "tsx src/cli.ts",
     "skillenv": "tsx src/cli.ts",
     "test": "vitest run",
