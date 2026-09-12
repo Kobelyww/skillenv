@@ -1,5 +1,5 @@
 import { createInterface } from "node:readline/promises";
-import { writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import pc from "picocolors";
@@ -357,7 +357,7 @@ async function runAgentCommand(
 
   const rl = createInterface({ input: process.stdin, output: process.stdout });
   process.stderr.write(
-    `${pc.dim("interactive REPL — /exit /sessions /skills /tools /export [file]")}\n`,
+    `${pc.dim("interactive REPL — /exit /sessions /skills /tools /memory /export [file]")}\n`,
   );
 
   try {
@@ -382,6 +382,15 @@ async function runAgentCommand(
       if (line === "/skills") {
         for (const name of envSkillNames(env.root)) {
           process.stdout.write(`${name}\n`);
+        }
+        continue;
+      }
+      if (line === "/memory") {
+        const memoryFile = path.join(env.root, "memory", "MEMORY.md");
+        try {
+          process.stdout.write(readFileSync(memoryFile, "utf8"));
+        } catch {
+          process.stdout.write("(memory is empty)\n");
         }
         continue;
       }
