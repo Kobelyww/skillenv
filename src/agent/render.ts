@@ -24,7 +24,10 @@ export function quietRender(): AgentRenderEvents {
     onTurnStart: () => {},
     onToolCall: () => {},
     onToolResult: () => {},
-    onInfo: () => {},
+    // Metadata (usage, failover notices, compaction) still surfaces on stderr.
+    onInfo: (line) => {
+      process.stderr.write(`${line}\n`);
+    },
   };
 }
 
