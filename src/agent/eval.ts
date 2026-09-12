@@ -108,6 +108,8 @@ export interface RunEvalOptions {
   keepWorkdirs?: boolean;
   render: AgentRenderEvents;
   compactChars?: number;
+  /** Default iteration cap for cases that do not set their own. */
+  defaultMaxIterations?: number;
 }
 
 /**
@@ -144,7 +146,7 @@ export async function runEvalSuite(suite: EvalSuite, options: RunEvalOptions): P
           provider: caseProvider,
           fallbackProvider: options.fallbackProvider,
           workdir: caseDir,
-          maxIterations: evalCase.maxIterations,
+          maxIterations: evalCase.maxIterations ?? options.defaultMaxIterations,
           compactChars: options.compactChars,
         },
         messages,

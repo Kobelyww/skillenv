@@ -42,6 +42,7 @@ interface EvalCliOptions {
   fallbackModel?: string;
   report?: string;
   keepWorkdirs?: boolean;
+  maxIterations?: string;
 }
 
 interface AgentCliOptions {
@@ -106,6 +107,7 @@ export function registerAgentCommands(program: Command): void {
     .option("--fallback-model <model>", "Model for the fallback provider.")
     .option("--report <file>", "Write a JSON report to this file.")
     .option("--keep-workdirs", "Keep per-case workdirs for inspection.", false)
+    .option("--max-iterations <n>", "Default iteration cap for cases without their own.", "25")
     .action(async (suiteFile: string, envName: string, options: EvalCliOptions) => {
       const { loadEvalSuite, runEvalSuite } = await import("./eval.js");
       const env = mustGetEnv(envName);
@@ -148,6 +150,7 @@ export function registerAgentCommands(program: Command): void {
         workdir: process.cwd(),
         keepWorkdirs: options.keepWorkdirs,
         render: terminalRender(),
+        defaultMaxIterations: Math.max(1, Number.parseInt(options.maxIterations ?? "25", 10) || 25),
       });
       for (const result of report.results) {
         const mark = result.passed ? pc.green("✓") : pc.red("✗");
