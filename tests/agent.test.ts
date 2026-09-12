@@ -593,3 +593,82 @@ describe("agent loop", () => {
     expect(presentSkillNames(env.root)).toEqual(["latex"]);
   });
 });
+
+describe("sessionToMarkdown", () => {
+  it("renders a readable transcript", async () => {
+    const { sessionToMarkdown } = await import("../src/agent/session.js");
+    const markdown = sessionToMarkdown({
+      id: "agent-x",
+      created_at: "2026-09-12T00:00:00Z",
+      updated_at: "2026-09-12T00:00:00Z",
+      provider: "deepseek",
+      model: "deepseek-chat",
+      env: "demo",
+      messages: [
+        { role: "user", content: "do the thing" },
+        { role: "assistant", content: null, tool_calls: [{ id: "t1", type: "function", function: { name: "read_file", arguments: '{"path":"a"}' } }] },
+        { role: "tool", tool_call_id: "t1", name: "read_file", content: "file body" },
+        { role: "assistant", content: "done" },
+      ],
+    });
+    expect(markdown).toContain("# agent session agent-x");
+    expect(markdown).toContain("deepseek/deepseek-chat");
+    expect(markdown).toContain("## tool call: read_file");
+    expect(markdown).toContain("## tool: read_file");
+    expect(markdown).toContain("file body");
+    expect(markdown).toContain("## assistant");
+    expect(markdown).toContain("done");
+  });
+});
+
+describe("render", () => {
+  it("quiet mode sends info to stderr and text to stdout", async () => {
+    const { quietRender } = await import("../src/agent/render.js");
+    const render = quietRender();
+    const stdoutWrites: string[] = [];
+    const stderrWrites: string[] = [];
+    const origOut = process.stdout.write.bind(process.stdout);
+    const origErr = process.stderr.write.bind(process.stderr);
+    process.stdout.write = ((chunk: string) => {
+      stdoutWrites.push(String(chunk));
+      return true;
+    }) as typeof process.stdout.write;
+    process.stderr.write = ((chunk: string) => {
+      stderrWrites.push(String(chunk));
+      return true;
+    }) as typeof process.stderr.write;
+    try {
+      render.onTextDelta("visible");
+      render.onInfo("metadata");
+      render.onToolCall("run_command", "{}");
+      render.onToolResult("run_command", true, "ok");
+    } finally {
+      process.stdout.write = origOut;
+      process.stderr.write = origErr;
+    }
+    expect(stdoutWrites.join("")).toBe("visible");
+    expect(stderrWrites.join("")).toContain("metadata");
+  });
+
+  it("terminal mode renders tool cards", async () => {
+    const { terminalRender } = await import("../src/agent/render.js");
+    const render = terminalRender();
+    const writes: string[] = [];
+    const origOut = process.stdout.write.bind(process.stdout);
+    process.stdout.write = ((chunk: string) => {
+      writes.push(String(chunk));
+      return true;
+    }) as typeof process.stdout.write;
+    try {
+      render.onToolCall("read_file", '{"path":"a"}');
+      render.onToolResult("read_file", false, "boom");
+      render.onInfo("note");
+    } finally {
+      process.stdout.write = origOut;
+    }
+    const all = writes.join("");
+    expect(all).toContain("read_file");
+    expect(all).toContain("boom");
+    expect(all).toContain("note");
+  });
+});

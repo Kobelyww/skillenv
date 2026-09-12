@@ -25,6 +25,8 @@
   agent — per-case tool-sequence, file-existence, and exit-code assertions
   with JSON reports and CI-gating exit codes (see
   `examples/suites/coding.yaml`).
+- Coverage tooling (@vitest/coverage-v8) and unit tests for rendering,
+  scaffolds, runner, skill frontmatter, and session markdown export.
 - Eval `agent-contains` expectation: assert (case-insensitive) that the
   agent's final answer contains given strings.
 - `skillenv session export <env> <id> [-o file]`: Markdown transcript export.

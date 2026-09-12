@@ -265,6 +265,13 @@ version (not simulated):
   `skill_list`/`skill_read` against a real installed skill.
 - **Real GitHub installs** from this repository and from
   `openai/skills` (zipball download → subtree copy → checksum lock).
+- **Agent evaluation suites run live** (`agent-eval`, DeepSeek): 2/2 cases
+  passed with tool-sequence and file assertions.
+- **Self-hosting**: `env rename` and the eval `agent-contains` expectation
+  were implemented by skillenv's own agent on a copy of this repository, then
+  reviewed, tested, and adopted (see git history).
+- **Cross-platform CI**: Node 20/22 × ubuntu/macos/**windows**, all green —
+  the Windows leg caught and fixed real path-separator and `.cmd` shim bugs.
 
 ## Documentation
 
