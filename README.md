@@ -7,7 +7,19 @@
 Give every task its own isolated agent home: skills, plugins, sessions, and
 configuration — for **Codex**, **Claude Code**, **pi**, and any agent CLI.
 
-`npm install -g @kobelyww/skillenv`
+Install (once published to npm — requires the `NPM_TOKEN` release secret,
+see [docs/publishing.md](docs/publishing.md)):
+
+```bash
+npm install -g @kobelyww/skillenv
+```
+
+Or straight from a clone:
+
+```bash
+git clone https://github.com/Kobelyww/skillenv.git && cd skillenv
+npm install && npm run build && npm install -g .
+```
 
 [![CI](https://github.com/Kobelyww/skillenv/actions/workflows/ci.yml/badge.svg)](../../actions)
 ![Node](https://img.shields.io/badge/Node-20%2B-green)
