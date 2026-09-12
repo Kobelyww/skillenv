@@ -357,8 +357,15 @@ const runCommandTool: ToolContext2 = {
     if (result.stderr) parts.push(truncate(result.stderr, MAX_OUTPUT / 2));
     let ok = true;
     if (result.error) {
-      ok = false;
-      parts.push(`error: ${(result.error as Error).message}`);
+      const code = (result.error as NodeJS.ErrnoException).code;
+      if (code === "ENOBUFS") {
+        // The command produced more output than the capture buffer; the
+        // partial stdout we did capture is still useful to the model.
+        parts.push("warning: output exceeded the capture buffer; pipe through tail/head for large outputs");
+      } else {
+        ok = false;
+        parts.push(`error: ${(result.error as Error).message}`);
+      }
     } else if (result.status !== 0) {
       ok = false;
       const signal = result.signal ? ` (signal ${result.signal})` : "";

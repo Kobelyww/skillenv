@@ -224,6 +224,16 @@ describe("tools", () => {
     expect(failing.output).toContain("exit code: 3");
   });
 
+  it("survives output larger than the capture buffer", async () => {
+    const tools = defaultTools();
+    const big = await executeTool(tools, context, {
+      id: "big1",
+      type: "function",
+      function: { name: "run_command", arguments: JSON.stringify({ command: "node -e \"process.stdout.write('x'.repeat(9 * 1024 * 1024))\"", timeout_ms: 120_000 }) },
+    });
+    expect(big.output).toContain("exceeded the capture buffer");
+  });
+
   it("blocks private addresses in web_fetch", async () => {
     const tools = defaultTools();
     const result = await executeTool(tools, context, {
