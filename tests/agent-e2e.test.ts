@@ -9,7 +9,9 @@ const ROOT = path.resolve(import.meta.dirname, "..");
 let HOME = "";
 let projectDir = "";
 let server: http.Server;
+let anthropicServerRef: http.Server | null = null;
 let providerUrl = "";
+let anthropicUrl = "";
 let requestsSeen = 0;
 
 function sseChunk(delta: Record<string, unknown>, finish?: string): string {
@@ -53,6 +55,47 @@ beforeAll(async () => {
     });
   });
 
+  // Anthropic-protocol mock for the provider-dispatch e2e test.
+  const anthropicServer = http.createServer((req, res) => {
+    let body = "";
+    req.on("data", (c) => (body += c));
+    req.on("end", () => {
+      const parsed = JSON.parse(body) as { messages: { role: string; content: unknown }[] };
+      const sawToolResult = parsed.messages.some(
+        (m) => m.role === "user" && Array.isArray(m.content) &&
+          (m.content as { type?: string }[]).some((b) => b.type === "tool_result"),
+      );
+      res.writeHead(200, { "Content-Type": "text/event-stream" });
+      if (!sawToolResult) {
+        res.write(
+          `event: content_block_start\ndata: ${JSON.stringify({ type: "content_block_start", index: 0, content_block: { type: "tool_use", id: "toolu_1", name: "read_file" } })}\n\n`,
+        );
+        res.write(
+          `event: content_block_delta\ndata: ${JSON.stringify({ type: "input_json_delta", index: 0, partial_json: JSON.stringify({ path: "README.md" }) })}\n\n`,
+        );
+        res.write(
+          `event: message_delta\ndata: ${JSON.stringify({ type: "message_delta", delta: { stop_reason: "tool_use" } })}\n\n`,
+        );
+      } else {
+        res.write(
+          `event: content_block_delta\ndata: ${JSON.stringify({ type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "The README says: demo" } })}\n\n`,
+        );
+        res.write(
+          `event: message_delta\ndata: ${JSON.stringify({ type: "message_delta", delta: { stop_reason: "end_turn" } })}\n\n`,
+        );
+      }
+      res.end("data: [DONE]\n\n");
+    });
+  });
+  await new Promise<void>((resolve) => {
+    anthropicServer.listen(0, "127.0.0.1", () => {
+      const address = anthropicServer.address() as { port: number };
+      anthropicUrl = `http://127.0.0.1:${address.port}/v1`;
+      resolve();
+    });
+  });
+  anthropicServerRef = anthropicServer;
+
   await new Promise<void>((resolve) => {
     server.listen(0, "127.0.0.1", () => {
       const address = server.address() as { port: number };
@@ -69,6 +112,9 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await new Promise<void>((resolve) => server.close(() => resolve()));
+  if (anthropicServerRef) {
+    await new Promise<void>((resolve) => anthropicServerRef.close(() => resolve()));
+  }
 });
 
 const CHILD_ENV = {
@@ -80,11 +126,15 @@ const CHILD_ENV = {
   OPENAI_MODEL: "mock-model",
 };
 
-function agent(args: string[], timeoutMs = 30_000): Promise<{ code: number; stdout: string; stderr: string }> {
+function agent(
+  args: string[],
+  timeoutMs = 30_000,
+  providerEnv: Record<string, string> = {},
+): Promise<{ code: number; stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
     const child = spawn("node", [path.join(ROOT, "dist", "cli.js"), "agent", "agent-e2e", ...args], {
       cwd: projectDir,
-      env: { ...CHILD_ENV, SKILLENV_HOME: HOME, OPENAI_BASE_URL: providerUrl },
+      env: { ...CHILD_ENV, SKILLENV_HOME: HOME, OPENAI_BASE_URL: providerUrl, ...providerEnv },
       stdio: ["ignore", "pipe", "pipe"],
     });
     let stdout = "";
@@ -143,6 +193,24 @@ describe("agent end-to-end through the CLI", () => {
     expect(transcripts.some((text) => text.includes("read_file"))).toBe(true);
     expect(transcripts.some((text) => text.includes("Summarize the README again."))).toBe(true);
     expect(transcripts.some((text) => text.includes("Summarize the README."))).toBe(true);
+  });
+
+  it("drives the full loop over the Anthropic Messages protocol", async () => {
+    const result = await agent(
+      ["-p", "anthropic", "-q", "Summarize the README."],
+      30_000,
+      { SKILLENV_AGENT_PROVIDER: "anthropic", ANTHROPIC_API_KEY: "test-key", ANTHROPIC_BASE_URL: anthropicUrl, ANTHROPIC_MODEL: "mock-claude" },
+    );
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain("The README says:");
+    expect(result.stderr).toContain("Anthropic");
+    expect(result.stderr).toContain("mock-claude");
+  });
+
+  it("fails fast when --dir does not exist", async () => {
+    const result = await agent(["-q", "hi", "--dir", "/nonexistent/dir/xyz"]);
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("workdir does not exist");
   });
 
   it("streams errors clearly when the provider is unreachable", async () => {

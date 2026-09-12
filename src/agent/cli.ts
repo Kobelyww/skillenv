@@ -1,5 +1,5 @@
 import { createInterface } from "node:readline/promises";
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import pc from "picocolors";
@@ -257,6 +257,9 @@ async function runAgentCommand(
   }
 
   const workdir = path.resolve(options.dir ?? process.cwd());
+  if (!statSync(workdir, { throwIfNoEntry: false })?.isDirectory()) {
+    fail(`workdir does not exist: ${workdir}`);
+  }
   const maxIterations = Math.max(1, Number.parseInt(options.maxIterations ?? "25", 10) || 25);
   const parsedTemperature =
     options.temperature !== undefined ? Number.parseFloat(options.temperature) : Number.NaN;

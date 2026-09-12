@@ -75,6 +75,7 @@ export const PROVIDERS: Record<string, ProviderPreset> = {
     apiKeyEnv: "ANTHROPIC_API_KEY",
     defaultModel: "claude-sonnet-4-5",
     modelEnv: "ANTHROPIC_MODEL",
+    baseUrlEnv: "ANTHROPIC_BASE_URL",
   },
 };
 
