@@ -283,6 +283,7 @@ version (not simulated):
 - [Manifest spec](docs/manifest-spec.md) — `skillenv.yml` format
 - [Lockfile spec](docs/lockfile-spec.md) — `lock.json` format and checksums
 - [Publishing](docs/publishing.md) — release and registry workflow
+- [Development log](docs/development-log.md) — how the v2 rewrite was built and verified
 
 ## Development
 
