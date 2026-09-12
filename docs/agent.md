@@ -104,6 +104,35 @@ immediately, so a crash never loses more than the current turn.
 - Token usage per turn is accumulated from the provider's stream usage chunks
   (providers that support `stream_options.include_usage`).
 
+## Evaluation suites
+
+`skillenv agent-eval` regression-tests agent behavior the way a unit suite
+regression-tests code: each case runs the real loop in a fresh workdir, then
+asserts on the tool sequence, produced files, and verification commands.
+
+```yaml
+# examples/suites/coding.yaml
+name: coding-basics
+cases:
+  - name: implement-and-verify
+    prompt: >-
+      Create add.py ... run the tests and make sure they pass.
+    max-iterations: 12
+    expect:
+      tools-used: [write_file, run_command]
+      files-exist: [add.py, test_add.py]
+      command: ["python3", "test_add.py"]
+```
+
+```bash
+skillenv agent-eval examples/suites/coding.yaml my-env --report report.json
+```
+
+Exit code is non-zero when any case fails, so the suite gates CI the same way
+`pytest` does. `--keep-workdirs` preserves each case directory for
+inspection. Evaluation runs use a real provider (they exercise the model);
+the loop itself is additionally covered by mock-provider e2e tests.
+
 ## Testing without a provider
 
 The full loop is covered by tests against a local mock server

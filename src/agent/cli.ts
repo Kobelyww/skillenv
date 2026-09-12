@@ -31,6 +31,17 @@ function mustGetEnv(envName: string): Env {
   }
 }
 
+interface EvalCliOptions {
+  provider?: string;
+  model?: string;
+  baseUrl?: string;
+  apiKey?: string;
+  fallbackProvider?: string;
+  fallbackModel?: string;
+  report?: string;
+  keepWorkdirs?: boolean;
+}
+
 interface AgentCliOptions {
   provider?: string;
   model?: string;
@@ -74,6 +85,79 @@ export function registerAgentCommands(program: Command): void {
     .argument("[prompt]", "One-shot prompt; omit for an interactive REPL.")
     .action(async (envName: string, prompt: string | undefined, options: AgentCliOptions) => {
       await runAgentCommand(envName, prompt, options);
+    });
+
+  program
+    .command("agent-eval <suite> <env>")
+    .description("Run a YAML agent evaluation suite (tool-sequence, file, and exit-code assertions).")
+    .option("-p, --provider <id>", "Provider preset (default: deepseek).")
+    .option("-m, --model <model>", "Model name.")
+    .option("--base-url <url>", "Override the provider base URL.")
+    .option("--api-key <key>", "Override the API key.")
+    .option("--fallback-provider <id>", "Failover provider.")
+    .option("--fallback-model <model>", "Model for the fallback provider.")
+    .option("--report <file>", "Write a JSON report to this file.")
+    .option("--keep-workdirs", "Keep per-case workdirs for inspection.", false)
+    .action(async (suiteFile: string, envName: string, options: EvalCliOptions) => {
+      const { loadEvalSuite, runEvalSuite } = await import("./eval.js");
+      const env = mustGetEnv(envName);
+      let provider;
+      try {
+        provider = resolveProvider({
+          provider: options.provider,
+          model: options.model,
+          baseUrl: options.baseUrl,
+          apiKey: options.apiKey,
+        });
+      } catch (error) {
+        fail((error as Error).message);
+      }
+      let fallbackProvider;
+      if (options.fallbackProvider) {
+        try {
+          fallbackProvider = resolveProvider({
+            provider: options.fallbackProvider,
+            model: options.fallbackModel,
+          });
+        } catch (error) {
+          fail(`fallback provider: ${(error as Error).message}`);
+        }
+      }
+      let suite;
+      try {
+        suite = loadEvalSuite(suiteFile);
+      } catch (error) {
+        fail((error as Error).message);
+      }
+      process.stderr.write(
+        `${pc.dim(`agent-eval ${suite.name} · ${suite.cases.length} case(s) · ${provider.id}/${provider.model}`)}\n`,
+      );
+      const report = await runEvalSuite(suite as NonNullable<typeof suite>, {
+        envRoot: env.root,
+        envName: env.name,
+        provider,
+        fallbackProvider,
+        workdir: process.cwd(),
+        keepWorkdirs: options.keepWorkdirs,
+        render: terminalRender(),
+      });
+      for (const result of report.results) {
+        const mark = result.passed ? pc.green("✓") : pc.red("✗");
+        process.stdout.write(`${mark} ${result.name}  tools=[${result.toolNames.join(", ")}]\n`);
+        for (const failure of result.failures) {
+          process.stdout.write(`    ${pc.red(failure)}\n`);
+        }
+      }
+      process.stdout.write(
+        `${report.passed}/${report.total} passed (rate=${report.passRate.toFixed(2)})\n`,
+      );
+      if (options.report) {
+        writeFileSync(path.resolve(options.report), `${JSON.stringify(report, null, 2)}\n`, "utf8");
+        process.stdout.write(`report: ${path.resolve(options.report)}\n`);
+      }
+      if (report.passed < report.total) {
+        process.exit(1);
+      }
     });
 
   const sessionApp = program.command("session").description("Inspect agent sessions.");

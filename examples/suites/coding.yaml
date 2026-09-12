@@ -1,0 +1,34 @@
+# Agent evaluation suite — regression-test the coding loop.
+#
+# Run against a real provider (costs tokens, needs the provider's key):
+#   skillenv agent-eval examples/suites/coding.yaml my-env
+# With a report and CI gating (exit 1 on any failure):
+#   skillenv agent-eval examples/suites/coding.yaml my-env --report report.json
+name: coding-basics
+cases:
+  - name: implement-and-verify
+    prompt: >-
+      Create add.py: a Python 3 script that reads two integers from argv and
+      prints their sum. Then create test_add.py with unittest covering
+      positive numbers, negatives, and zero. Run the tests and make sure they
+      pass.
+    max-iterations: 12
+    expect:
+      tools-used:
+        - write_file
+        - run_command
+      files-exist:
+        - add.py
+        - test_add.py
+      command: ["python3", "test_add.py"]
+  - name: read-only-recon
+    prompt: >-
+      Without writing or running anything, use list_dir to inventory this
+      directory and summarize what you find in one sentence.
+    max-iterations: 5
+    expect:
+      tools-used:
+        - list_dir
+      tools-forbidden:
+        - write_file
+        - run_command

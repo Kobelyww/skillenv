@@ -108,6 +108,8 @@ export function compactMessages(
 export interface AgentTurnResult {
   content: string;
   toolCalls: number;
+  /** Ordered names of every tool invoked during the turn. */
+  toolNames: string[];
   iterations: number;
   usage: { prompt_tokens: number; completion_tokens: number };
 }
@@ -202,6 +204,7 @@ export async function runAgentTurn(
 
   let iteration = 0;
   let totalToolCalls = 0;
+  const toolNames: string[] = [];
   const usage = { prompt_tokens: 0, completion_tokens: 0 };
 
   /**
@@ -288,6 +291,7 @@ export async function runAgentTurn(
       return {
         content: summary.content,
         toolCalls: totalToolCalls,
+        toolNames,
         iterations: iteration,
         usage,
       };
@@ -306,11 +310,12 @@ export async function runAgentTurn(
     messages.push(assistantMessage);
 
     if (completion.toolCalls.length === 0) {
-      return { content: completion.content, toolCalls: totalToolCalls, iterations: iteration, usage };
+      return { content: completion.content, toolCalls: totalToolCalls, toolNames, iterations: iteration, usage };
     }
 
     for (const call of completion.toolCalls as ToolCall[]) {
       totalToolCalls += 1;
+      toolNames.push(call.function.name);
       render.onToolCall(call.function.name, call.function.arguments);
       const result = await executeTool(tools, context, call);
       render.onToolResult(call.function.name, result.ok, result.output);

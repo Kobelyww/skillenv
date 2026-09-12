@@ -18,6 +18,11 @@
 - Live end-to-end verification against the DeepSeek API: full coding sessions
   (implement CLI + unittest suite, multi-turn continuation, self-repair) with
   independent result verification.
+- `skillenv agent-eval <suite.yaml> <env>`: YAML evaluation suites for the
+  agent — per-case tool-sequence, file-existence, and exit-code assertions
+  with JSON reports and CI-gating exit codes (see
+  `examples/suites/coding.yaml`).
+- `skillenv session export <env> <id> [-o file]`: Markdown transcript export.
 - `skillenv env rename <old> <new>`: move an environment and rewrite its
   manifest name, preserving skills, plugins, lock, and sessions.
 - Live end-to-end verification against the DeepSeek API: full coding sessions
