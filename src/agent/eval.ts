@@ -3,7 +3,6 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { parse } from "yaml";
-import { getEnv } from "../env.js";
 import { runAgentTurn } from "./loop.js";
 import type { ChatMessage, ResolvedProvider } from "./providers.js";
 import type { AgentRenderEvents } from "./render.js";
@@ -185,9 +184,4 @@ export async function runEvalSuite(suite: EvalSuite, options: RunEvalOptions): P
     total: results.length,
     passRate: results.length > 0 ? passed / results.length : 0,
   };
-}
-
-/** Resolve the environment for an eval run, creating nothing. */
-export function evalEnvRoot(envName: string): string {
-  return getEnv(envName, process.env.SKILLENV_HOME ?? path.join(process.env.HOME ?? "", ".skillenv")).root;
 }

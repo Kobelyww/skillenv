@@ -248,8 +248,9 @@ async function runAgentCommand(
 
   const workdir = path.resolve(options.dir ?? process.cwd());
   const maxIterations = Math.max(1, Number.parseInt(options.maxIterations ?? "25", 10) || 25);
-  const temperature =
-    options.temperature !== undefined ? Number.parseFloat(options.temperature) : undefined;
+  const parsedTemperature =
+    options.temperature !== undefined ? Number.parseFloat(options.temperature) : Number.NaN;
+  const temperature = Number.isNaN(parsedTemperature) ? undefined : parsedTemperature;
   const inlineSkills = (options.skills ?? "")
     .split(",")
     .map((name) => name.trim())
@@ -349,7 +350,13 @@ async function runAgentCommand(
 
   try {
     for (;;) {
-      const line = (await rl.question(pc.green("you> "))).trim();
+      let line: string;
+      try {
+        line = (await rl.question(pc.green("you> "))).trim();
+      } catch {
+        // Ctrl+D / closed stdin: leave the REPL the same way /exit would.
+        break;
+      }
       if (line.length === 0) continue;
       if (line === "/exit" || line === "/quit") break;
       if (line === "/sessions") {
