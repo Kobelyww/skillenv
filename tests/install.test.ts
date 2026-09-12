@@ -32,6 +32,12 @@ describe("parseGitHubSource", () => {
     expect(() => parseGitHubSource("github:o/r/skill@")).toThrow("ref cannot be empty");
     expect(() => parseGitHubSource("https://example.com")).toThrow("github:");
   });
+
+  it("rejects path traversal in repo paths and refs", () => {
+    expect(() => parseGitHubSource("github:o/r/../../evil")).toThrow("'.' or '..'");
+    expect(() => parseGitHubSource("github:../evil/skill")).toThrow("'.' or '..'");
+    expect(() => parseGitHubSource("github:o/r/skill@../..")).toThrow("'.' or '..'");
+  });
 });
 
 describe("parseSourceSpec", () => {
