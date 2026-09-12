@@ -94,7 +94,7 @@ describe("CLI end-to-end", () => {
 
   it("run executes with adapter isolation vars", () => {
     cli(["create", "runner"]);
-    const result = cli(["run", "runner", "--", "node", "-e", "process.stdout.write(process.env.CODEX_HOME ?? 'missing')"]);
+    const result = cli(["run", "runner", "--", "node", "-e", "process.stdout.write(process.env.CODEX_HOME??'missing')"]);
     expect(result.status).toBe(0);
     expect(result.stdout).toContain(path.join(HOME, "envs", "runner"));
   });
