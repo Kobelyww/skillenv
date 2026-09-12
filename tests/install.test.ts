@@ -36,7 +36,7 @@ describe("parseGitHubSource", () => {
   it("rejects path traversal in repo paths and refs", () => {
     expect(() => parseGitHubSource("github:o/r/../../evil")).toThrow("'.' or '..'");
     expect(() => parseGitHubSource("github:../evil/skill")).toThrow("'.' or '..'");
-    expect(() => parseGitHubSource("github:o/r/skill@../..")).toThrow("'.' or '..'");
+    expect(() => parseGitHubSource("github:o/r/skill@../..")).toThrow("ref cannot contain '..'");
   });
 });
 

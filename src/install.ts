@@ -36,11 +36,16 @@ export function parseGitHubSource(value: string): GitHubSkillSource {
   if (ref.length === 0) {
     throw new Error("GitHub skill source ref cannot be empty");
   }
-  // Path-traversal guard: no segment may escape the repository archive.
-  for (const segment of [...pieces, ref]) {
+  // Path-traversal guard: no path segment may escape the repository archive,
+  // and refs follow git's own rule forbidding ".." (so `@../..` cannot walk
+  // out of the archive URL either).
+  for (const segment of pieces) {
     if (segment === "." || segment === "..") {
       throw new Error(`GitHub skill source cannot contain '.' or '..' path segments: ${value}`);
     }
+  }
+  if (ref.includes("..")) {
+    throw new Error(`GitHub skill source ref cannot contain '..': ${value}`);
   }
   const [owner, repo] = pieces;
   return { kind: "github", owner: owner as string, repo: repo as string, path: pieces.slice(2).join("/"), ref };
