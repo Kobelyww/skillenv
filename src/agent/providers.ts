@@ -249,12 +249,23 @@ export async function chatCompletionStream(
     buffer += decoder.decode(value, { stream: true });
 
     let separator: number;
+    const pendingLines: string[] = [];
     while ((separator = buffer.indexOf("\n")) !== -1) {
-      const line = buffer.slice(0, separator).trimEnd();
+      pendingLines.push(buffer.slice(0, separator));
       buffer = buffer.slice(separator + 1);
-      if (!line.startsWith("data:")) continue;
-      const payload = line.slice(5).trim();
-      if (payload === "[DONE]") continue;
+    }
+    // A server may close the stream without a trailing newline; the final
+    // partial line is still a complete event and must not be dropped.
+    if (buffer.length > 0) {
+      pendingLines.push(buffer);
+      buffer = "";
+    }
+    for (const rawLine of pendingLines) {
+      {
+        const line = rawLine.trimEnd();
+        if (!line.startsWith("data:")) continue;
+        const payload = line.slice(5).trim();
+        if (payload === "[DONE]") continue;
       let chunk: {
         choices?: {
           delta?: {
@@ -295,6 +306,7 @@ export async function chatCompletionStream(
         if (toolDelta.function?.name) existing.function.name += toolDelta.function.name;
         if (toolDelta.function?.arguments) existing.function.arguments += toolDelta.function.arguments;
         accumulator.toolCalls.set(index, existing);
+      }
       }
     }
   }
@@ -422,12 +434,21 @@ export async function anthropicChatCompletionStream(
     if (done) break;
     buffer += decoder.decode(value, { stream: true });
     let separator: number;
+    const pendingLines: string[] = [];
     while ((separator = buffer.indexOf("\n")) !== -1) {
-      const line = buffer.slice(0, separator).trimEnd();
+      pendingLines.push(buffer.slice(0, separator));
       buffer = buffer.slice(separator + 1);
-      if (!line.startsWith("data:")) continue;
-      const payload = line.slice(5).trim();
-      if (payload.length === 0) continue;
+    }
+    if (buffer.length > 0) {
+      pendingLines.push(buffer);
+      buffer = "";
+    }
+    for (const rawLine of pendingLines) {
+      {
+        const line = rawLine.trimEnd();
+        if (!line.startsWith("data:")) continue;
+        const payload = line.slice(5).trim();
+        if (payload.length === 0) continue;
       let event: {
         type?: string;
         index?: number;
@@ -460,6 +481,7 @@ export async function anthropicChatCompletionStream(
         if (event.usage?.output_tokens) state.outputTokens = event.usage.output_tokens;
       } else if (event.type === "message_start") {
         state.inputTokens = event.message?.usage?.input_tokens ?? 0;
+      }
       }
     }
   }

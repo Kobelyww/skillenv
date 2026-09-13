@@ -633,6 +633,76 @@ describe("agent loop", () => {
     expect(provider.model).toBe("claude-sonnet-4-5");
   });
 
+  it("does not retry after partial output streamed (no duplication)", async () => {
+    const env = createEnv("midstream-env", HOME);
+    const server = http.createServer((req, res) => {
+      let body = "";
+      req.on("data", (c) => (body += c));
+      req.on("end", () => {
+        JSON.parse(body);
+        res.writeHead(200, { "Content-Type": "text/event-stream" });
+        // Stream a partial token, then destroy the connection mid-stream.
+        res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: "partial-" } }] })}\n\n`);
+        setTimeout(() => res.destroy(), 20);
+      });
+    });
+    servers.push(server);
+    const url = await new Promise<string>((resolve) => {
+      server.listen(0, "127.0.0.1", () => resolve(`http://127.0.0.1:${(server.address() as { port: number }).port}/v1`));
+    });
+    const provider: ResolvedProvider = { id: "p", displayName: "P", baseUrl: url, apiKey: "", model: "m" };
+    const deltas: string[] = [];
+    const infos: string[] = [];
+    await expect(
+      runAgentTurn(
+        { envRoot: env.root, envName: "midstream-env", provider, workdir: HOME },
+        [{ role: "user", content: "hi" }],
+        {
+          onTextDelta: (text) => deltas.push(text),
+          onTurnStart: () => {},
+          onToolCall: () => {},
+          onToolResult: () => {},
+          onInfo: (line) => infos.push(line),
+        },
+      ),
+    ).rejects.toThrow();
+    // Exactly one partial token reached the terminal; no retry duplicated it.
+    expect(deltas).toEqual(["partial-"]);
+    expect(infos.some((line) => line.includes("retrying"))).toBe(false);
+  });
+
+  it("parses a final SSE event with no trailing newline", async () => {
+    const env = createEnv("noeol-env", HOME);
+    const server = http.createServer((req, res) => {
+      let body = "";
+      req.on("data", (c) => (body += c));
+      req.on("end", () => {
+        JSON.parse(body);
+        res.writeHead(200, { "Content-Type": "text/event-stream" });
+        // The last data line has no trailing newline before res.end().
+        res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: "tail event" }, finish_reason: "stop" }] })}`);
+        res.end();
+      });
+    });
+    servers.push(server);
+    const url = await new Promise<string>((resolve) => {
+      server.listen(0, "127.0.0.1", () => resolve(`http://127.0.0.1:${(server.address() as { port: number }).port}/v1`));
+    });
+    const provider: ResolvedProvider = { id: "p", displayName: "P", baseUrl: url, apiKey: "", model: "m" };
+    let text = "";
+    const result = await chatCompletionStream(
+      provider,
+      [{ role: "user", content: "hi" }],
+      [],
+      (delta) => {
+        text += delta;
+      },
+    );
+    expect(text).toBe("tail event");
+    expect(result.content).toBe("tail event");
+    expect(result.finishReason).toBe("stop");
+  });
+
   it("compacts aggressively and retries once on provider context overflow", async () => {
     const env = createEnv("overflow-env", HOME);
     let overflowSeen = false;

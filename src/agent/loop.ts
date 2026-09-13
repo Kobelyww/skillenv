@@ -265,16 +265,23 @@ export async function runAgentTurn(
     attempts: number,
   ): Promise<CompletionResult> => {
     let lastError: unknown;
+    let streamed = 0;
+    const counting = (text: string): void => {
+      streamed += text.length;
+      onDelta(text);
+    };
     for (let attempt = 1; attempt <= attempts; attempt++) {
       try {
-        return await streamChat(provider, requestMessages, requestTools, onDelta, {
+        return await streamChat(provider, requestMessages, requestTools, counting, {
           temperature: options.temperature,
           signal: options.signal,
         });
       } catch (error) {
         lastError = error;
         const retryable = !(error instanceof ProviderHttpError) || error.retryable;
-        if (!retryable || attempt >= attempts) {
+        // Any token that already reached the terminal forbids a retry: the
+        // new attempt would regenerate from scratch and duplicate output.
+        if (streamed > 0 || !retryable || attempt >= attempts) {
           throw error;
         }
         const delayMs = 500 * 2 ** (attempt - 1);

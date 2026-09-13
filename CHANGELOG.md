@@ -43,6 +43,9 @@
   independent agent code review; regression test first, then a one-line fix).
 - `run_command` survives ENOBUFS: oversized output returns the captured
   partial stdout with a truncation warning instead of failing.
+- SSE robustness (found by an agent review round): a final event without a
+  trailing newline is parsed instead of dropped; a mid-stream failure after
+  partial output never triggers a retry (which would duplicate output).
 - Context-overflow resilience: provider "maximum context length" errors now
   trigger an aggressive compaction pass and a single retry before failing.
   (Also fixed: the pre-turn compaction result was computed but never applied
