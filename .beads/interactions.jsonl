@@ -5,3 +5,4 @@
 {"id":"int-7284966bbfdf3c63e0d4dcde423d2dee","kind":"field_change","created_at":"2026-09-11T17:28:15.371451Z","actor":"Kobelyww","issue_id":"skillenv-5w0","extra":{"field":"status","new_value":"closed","old_value":"in_progress","reason":"Closed"}}
 {"id":"int-c902cd27553bfdc82d541221115fc704","kind":"field_change","created_at":"2026-09-11T17:38:53.415003Z","actor":"Kobelyww","issue_id":"skillenv-33c","extra":{"field":"status","new_value":"closed","old_value":"in_progress","reason":"Closed"}}
 {"id":"int-5341248229e63eba9bc27042a9e2474c","kind":"field_change","created_at":"2026-09-13T09:15:51.790046Z","actor":"Kobelyww","issue_id":"skillenv-goo","extra":{"field":"status","new_value":"closed","old_value":"open","reason":"Closed"}}
+{"id":"int-bf9ff875cebf363b375e58a88836fe3a","kind":"field_change","created_at":"2026-09-13T10:19:15.390629Z","actor":"Kobelyww","issue_id":"skillenv-gr1","extra":{"field":"status","new_value":"closed","old_value":"open","reason":"Closed"}}
