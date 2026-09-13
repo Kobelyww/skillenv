@@ -42,6 +42,11 @@ working on copies of this repository, then reviewed, tested, and adopted:
 - `env rename` (M6-era iteration)
 - the eval `agent-contains` expectation
 - cumulative session token usage
+- two SSE/reliability bugs in the streaming client (a final event without a
+  trailing newline was dropped; a mid-stream failure after partial output
+  triggered a duplicating retry) — round #6 reviewed loop.ts/providers.ts and
+  reported both candidates honestly as unverified; they were confirmed with
+  regression tests during review
 
 Each round surfaced the same workflow value: the agent writes code + tests
 and reports its own verification state; the human reviews the diff and runs
