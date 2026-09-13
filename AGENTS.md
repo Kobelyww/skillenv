@@ -1,5 +1,22 @@
 # Agent Instructions
 
+## Project: skillenv
+
+TypeScript CLI + built-in coding agent. Read `CONTRIBUTING.md` for the
+architecture map and `docs/` for behavior contracts before changing anything.
+
+**Gates before every push** (CI runs the same):
+
+```bash
+npm run lint && npm run typecheck && npm test && npm run build
+```
+
+**Compatibility contract**: error strings, lock format, and manifest parsing
+semantics inherited from Python 1.x are part of the contract — update tests
+and docs together when they change.
+
+## Issue tracking
+
 This project uses **bd** (beads) for issue tracking. Run `bd prime` for full workflow context.
 
 > **Architecture in one line:** Issues live in a local Dolt database
