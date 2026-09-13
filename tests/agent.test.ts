@@ -672,7 +672,6 @@ describe("agent loop", () => {
   });
 
   it("parses a final SSE event with no trailing newline", async () => {
-    const env = createEnv("noeol-env", HOME);
     const server = http.createServer((req, res) => {
       let body = "";
       req.on("data", (c) => (body += c));
