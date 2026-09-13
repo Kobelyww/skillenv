@@ -26,20 +26,12 @@ function runGit(cwd: string, args: string[], allowFailure = false): string {
   } catch (error) {
     if (allowFailure) return "";
     const detail = (error as Error).message.split("\n").slice(-3).join("\n");
-    throw new Error(`git ${args.join(" ")} failed: ${detail}`);
+    throw new Error(`git ${args.join(" ")} failed: ${detail}`, { cause: error });
   }
 }
 
 function mailBusDir(home: string): string {
   return path.join(home, "mailbus");
-}
-
-function envMailFiles(envRoot: string): { id: string; path: string }[] {
-  const dir = mailboxDir(envRoot);
-  if (!statSync(dir, { throwIfNoEntry: false })?.isDirectory()) return [];
-  return readdirSync(dir)
-    .filter((file) => file.endsWith(".json"))
-    .map((file) => ({ id: file.replace(/\.json$/, ""), path: path.join(dir, file) }));
 }
 
 function localEnvs(home: string): { name: string; root: string }[] {
