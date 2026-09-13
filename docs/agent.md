@@ -75,6 +75,8 @@ working directory).
 | `skill_read` | Full `SKILL.md` of one skill; path traversal rejected |
 | `memory_read` | The environment's persistent memory (`memory/MEMORY.md`) |
 | `memory_write` | Append a durable fact to persistent memory (one entry per call) |
+| `agent_send` | Deliver a message to a peer harness's mailbox (`--peers` declared) |
+| `agent_inbox` | Read mailbox messages from peers (unread marked read) |
 
 ## Skill injection
 
@@ -122,6 +124,26 @@ immediately, so a crash never loses more than the current turn.
   itself; only the outer loop bound stops pathological retries.
 - Token usage per turn is accumulated from the provider's stream usage chunks
   (providers that support `stream_options.include_usage`).
+
+## Multi-harness communication
+
+Launch several agents and let them coordinate over a file-backed message bus:
+
+```bash
+# Terminal 1 — worker hands off to a reviewer
+skillenv agent worker --peers reviewer --dir ~/proj -q "Implement the fix, then agent_send a summary to reviewer."
+
+# Terminal 2 — reviewer picks up the handoff
+skillenv agent reviewer --peers worker --dir ~/proj -q "Check agent_inbox, review the change, agent_send your verdict."
+```
+
+- Mailboxes live at `<env>/mailbox/` — one JSON file per message
+  (from/to/subject/body/read), no server involved.
+- `--peers env1,env2` declares which environments the agent can message;
+  peers are announced in the system prompt.
+- Humans share the bus: `skillenv mail send/list/read/delete <env> …`.
+- Keep `agent_send` bodies a single JSON string — malformed arguments are
+  echoed back so the model can repair them.
 
 ## Evaluation suites
 

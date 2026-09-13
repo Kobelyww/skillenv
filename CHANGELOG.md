@@ -6,6 +6,10 @@
 
 - Parallel tool execution: same-turn tool calls run concurrently with results
   re-joined in model order.
+- **Multi-harness communication**: environments get a file-backed mailbox;
+  agents message peers via `agent_send`/`agent_inbox` (declared with
+  `--peers`), humans via `skillenv mail send/list/read/delete`. Two-agent
+  coordination is covered by a deterministic e2e test and live runs.
 - Anthropic provider: native Messages protocol support (Claude models) with
   full tool streaming — request/response translated to the agent's
   OpenAI-shaped internal loop.

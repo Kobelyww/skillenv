@@ -96,6 +96,7 @@ self-contained agent home**:
 | **Registry v2** | Bundled registry + your own file/HTTP registry sources with caching, search, and a `registry publish` validation flow |
 | **Built-in coding agent** | `skillenv agent` — a streaming tool-calling agent over any OpenAI-compatible provider (DeepSeek, Nous Hermes, GLM, OpenAI, Ollama, ModelArts MaaS) with 10 workspace tools and skill injection |
 | **Persistent memory** | `memory_read`/`memory_write` tools keep durable facts, decisions, and preferences per environment — the working agent starts every session with its accumulated context |
+| **Multi-harness bus** | `--peers` + `agent_send`/`agent_inbox`: several agent harnesses coordinate over a file-backed mailbox (humans join with `skillenv mail`) |
 | **Reproducibility** | `export` emits a manifest from the lock; `create -f` recreates the environment elsewhere; `doctor` verifies layout and checksums |
 
 ## Quick start
