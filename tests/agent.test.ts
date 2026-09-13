@@ -370,6 +370,20 @@ describe("tools", () => {
     expect(all.output).toContain("[read]");
   });
 
+  it("repairs unquoted-key tool arguments before failing", async () => {
+    const tools = defaultTools();
+    const envA2 = createEnv("mail-a2", HOME);
+    const peerEnv = createEnv("peer-x", HOME);
+    const ctxA = { workdir, envRoot: envA2.root, envName: "mail-a2", peers: [{ name: "peer-x", envRoot: peerEnv.root }] };
+    const send = await executeTool(tools, ctxA, {
+      id: "r1",
+      type: "function",
+      function: { name: "agent_send", arguments: '{to": "peer-x", "message": "hello"}' },
+    });
+    expect(send.ok).toBe(true);
+    expect(send.output).toContain("delivered");
+  });
+
   it("exposes schemas for every tool", () => {
     const schemas = toolSchemas(defaultTools());
     const names = schemas.map((schema) => schema.function.name);

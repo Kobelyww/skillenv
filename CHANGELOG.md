@@ -41,6 +41,9 @@
 - `doctor`/`env info` parse the manifest adapter with the same YAML reader as
   the manifest module (quoted values and inline comments no longer break
   adapter detection).
+- Tool-argument repair: unquoted-key JSON from the model (`{to": "x"}`) is
+  repaired before the tool fails; unrepairable arguments echo the original
+  text so the model can self-correct.
 - Registry source names are validated (`..`, path separators) so the cache
   filename cannot escape `~/.skillenv/registry-cache` — found by an agent
   review round and confirmed by reproduction.

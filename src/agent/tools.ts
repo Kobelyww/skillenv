@@ -645,15 +645,31 @@ export async function executeTool(
   }
   let args: Record<string, unknown> = {};
   if (call.function.arguments.trim().length > 0) {
-    try {
-      args = JSON.parse(call.function.arguments) as Record<string, unknown>;
-    } catch (error) {
+    const parseArgs = (raw: string): Record<string, unknown> | null => {
+      try {
+        return JSON.parse(raw) as Record<string, unknown>;
+      } catch {
+        return null;
+      }
+    };
+    let parsed = parseArgs(call.function.arguments);
+    if (parsed === null) {
+      // Models occasionally emit `{to": "x"}` — a key missing its opening
+      // quote. Repair that exact shape before giving up: `[{,] key":` → `{"key":`.
+      const repaired = call.function.arguments.replace(
+        /([{,]\s*)([A-Za-z_][A-Za-z0-9_-]*)(")/g,
+        '$1"$2$3',
+      );
+      parsed = parseArgs(repaired);
+    }
+    if (parsed === null) {
       // Echo the malformed arguments so the model can see and repair them.
       return {
         ok: false,
-        output: `tool arguments are not valid JSON: ${(error as Error).message}\nyou sent: ${truncate(call.function.arguments, 400)}\nFix the JSON (escape inner quotes) and retry.`,
+        output: `tool arguments are not valid JSON: could not parse.\nyou sent: ${truncate(call.function.arguments, 400)}\nFix the JSON (escape inner quotes, quote every key) and retry.`,
       };
     }
+    args = parsed;
   }
   try {
     return await tool.execute(args, context);
