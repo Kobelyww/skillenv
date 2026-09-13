@@ -42,6 +42,9 @@ working on copies of this repository, then reviewed, tested, and adopted:
 - `env rename` (M6-era iteration)
 - the eval `agent-contains` expectation
 - cumulative session token usage
+- quoted `adapter:` values in skillenv.yml broke doctor/env info (regex vs
+  YAML parsing mismatch) — round #7 flagged it as an unproven hypothesis over
+  inspect/manifest/config; confirmed, fixed, and live-verified
 - two SSE/reliability bugs in the streaming client (a final event without a
   trailing newline was dropped; a mid-stream failure after partial output
   triggered a duplicating retry) — round #6 reviewed loop.ts/providers.ts and
