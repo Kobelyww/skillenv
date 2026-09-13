@@ -218,12 +218,12 @@ describe("agent end-to-end through the CLI", () => {
   it("two agent harnesses coordinate over the mailbox", { timeout: 180_000 }, async () => {
     // Deterministic scripted provider: write result -> agent_send -> summary,
     // then for the peer: inbox read -> reply -> summary.
-    const mk1 = spawnSync("node", [path.join(ROOT, "dist", "cli.js"), "create", "mail-worker"], {
+    const _mk1 = spawnSync("node", [path.join(ROOT, "dist", "cli.js"), "create", "mail-worker"], {
       env: { ...process.env, SKILLENV_HOME: HOME },
       encoding: "utf8",
     });
 
-    const mk2 = spawnSync("node", [path.join(ROOT, "dist", "cli.js"), "create", "mail-peer"], {
+    const _mk2 = spawnSync("node", [path.join(ROOT, "dist", "cli.js"), "create", "mail-peer"], {
       env: { ...process.env, SKILLENV_HOME: HOME },
       encoding: "utf8",
     });
