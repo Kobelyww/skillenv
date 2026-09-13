@@ -71,11 +71,15 @@ describe("syncMailboxes", () => {
     const outB2 = syncMailboxes(homeB, bareRemote, { message: "B export" });
     expect(outB2.exported).toBe(1);
 
-    // Machine A syncs again and receives the receipt.
+    // Machine A syncs again and receives the receipt (its own outbox copy of
+    // the original is also present; find the receipt by type).
     const outA2 = syncMailboxes(homeA, bareRemote, { message: "A pull" });
     expect(outA2.imported).toBe(1);
-    const receipt = readFileSync(path.join(aRoot, "mailbox", readdirSync(path.join(aRoot, "mailbox"))[0] as string), "utf8");
-    expect(receipt).toContain('"type": "receipt"');
+    const aMailFiles = readdirSync(path.join(aRoot, "mailbox"));
+    const receipts = aMailFiles
+      .map((f) => readFileSync(path.join(aRoot, "mailbox", f), "utf8"))
+      .filter((text) => text.includes('"type": "receipt"'));
+    expect(receipts.length).toBe(1);
 
     // Idempotent: syncing with nothing new exports nothing.
     const outA3 = syncMailboxes(homeA, bareRemote);
