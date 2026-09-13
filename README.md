@@ -238,7 +238,7 @@ skillenv clone <src> <target>
 skillenv install <env> <specs...> [--force] [--skip-existing]
 skillenv remove <env>
 skillenv export <env>
-skillenv doctor <env>
+skillenv doctor <env> [--agent]
 skillenv diff <a> <b>
 skillenv run <env> [-- command...]
 skillenv agent <env> [prompt] [-p provider] [-m model] [--fallback-provider id] [--tools names]
