@@ -26,6 +26,18 @@ describe("parseRegistryPayload", () => {
     expect(skill?.versions).toBeUndefined();
   });
 
+  it("rejects registry source names that would escape the cache dir", () => {
+    const home = useTempHome()();
+    expect(() => addRegistrySource("../../../tmp/evil", "https://example.com/r.json", home)).toThrow(
+      "path separators",
+    );
+    expect(() => addRegistrySource("..", "https://example.com/r.json", home)).toThrow("'..'");
+    expect(() => addRegistrySource("a/b", "https://example.com/r.json", home)).toThrow(
+      "path separators",
+    );
+    expect(listRegistrySources(home)).toEqual([]);
+  });
+
   it("rejects payloads without skills", () => {
     expect(() => parseRegistryPayload("{}")).toThrow("'skills' array");
   });

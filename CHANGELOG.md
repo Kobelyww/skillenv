@@ -34,6 +34,9 @@
   for A/B model comparison.
 - `agent-eval --case <name>` runs a single case; `--max-iterations` sets the
   default cap for cases without their own.
+- Registry source names are validated (`..`, path separators) so the cache
+  filename cannot escape `~/.skillenv/registry-cache` — found by an agent
+  review round and confirmed by reproduction.
 - GitHub skill sources reject path traversal (`..` in repo paths or refs)
   before any download — found during a security-focused review round.
 - `edit_file` inserts `$&`-style replacement strings literally (found by an

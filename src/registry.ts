@@ -85,6 +85,13 @@ export function listRegistrySources(home: string): RegistrySource[] {
 }
 
 export function addRegistrySource(name: string, url: string, home: string): void {
+  // The name becomes a cache filename; keep it from escaping the cache dir.
+  if (name.length === 0 || name.includes("/") || name.includes("\\")) {
+    throw new Error(`registry source name cannot be empty or contain path separators: '${name}'`);
+  }
+  if (name === "." || name === ".." || name.includes("..")) {
+    throw new Error(`registry source name cannot contain '..': '${name}'`);
+  }
   const file = registriesPath(home);
   mkdirSync(path.dirname(file), { recursive: true });
   // File sources are stored absolute so `registry update` works from any cwd.
