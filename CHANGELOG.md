@@ -10,6 +10,14 @@
   agents message peers via `agent_send`/`agent_inbox` (declared with
   `--peers`), humans via `skillenv mail send/list/read/delete`. Two-agent
   coordination is covered by a deterministic e2e test and live runs.
+- **Cross-machine mail sync**: `skillenv mail sync <git-url>` two-way
+  syncs every environment's mailbox over a plain git remote (outbox model —
+  messages addressed to remote peers are exported exactly once; imports land
+  in the matching local environment).
+- `skillenv mail prune <env> [--days N] [--all]`: delete old read (and
+  optionally unread) messages.
+- **Read receipts**: `agent_inbox` automatically acknowledges unread peer
+  messages with a receipt; receipts never generate receipts (no loops).
 - Anthropic provider: native Messages protocol support (Claude models) with
   full tool streaming — request/response translated to the agent's
   OpenAI-shaped internal loop.

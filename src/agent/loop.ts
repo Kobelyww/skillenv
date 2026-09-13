@@ -24,8 +24,8 @@ export interface AgentOptions {
   tools?: string[];
   /** Ask before every shell command (see ToolContext.confirmShell). */
   confirmShell?: (command: string) => Promise<boolean>;
-  /** Peer harnesses this agent can message via agent_send. */
-  peers?: { name: string; envRoot: string }[];
+  /** Peer harnesses this agent can message via agent_send. envRoot absent = remote peer (mail sync). */
+  peers?: { name: string; envRoot?: string }[];
   workdir: string;
   /** Skill names to inline fully in the system prompt (others are listed + on-demand). */
   inlineSkills?: string[];

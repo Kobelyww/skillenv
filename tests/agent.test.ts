@@ -384,6 +384,26 @@ describe("tools", () => {
     expect(send.output).toContain("delivered");
   });
 
+  it("jsonrepair salvages truncated and malformed arguments", async () => {
+    const tools = defaultTools();
+    // Truncated write_file arguments (conversation degradation shape).
+    const truncated = await executeTool(tools, context, {
+      id: "jr1",
+      type: "function",
+      function: { name: "write_file", arguments: '{"path": "trunc.txt", "content": "partial da' },
+    });
+    expect(truncated.ok).toBe(true);
+    expect(readFileSync(path.join(workdir, "trunc.txt"), "utf8")).toContain("partial da");
+
+    // Unquoted keys.
+    const unquoted = await executeTool(tools, context, {
+      id: "jr2",
+      type: "function",
+      function: { name: "list_dir", arguments: "{path: src}" },
+    });
+    expect(unquoted.ok).toBe(true);
+  });
+
   it("exposes schemas for every tool", () => {
     const schemas = toolSchemas(defaultTools());
     const names = schemas.map((schema) => schema.function.name);

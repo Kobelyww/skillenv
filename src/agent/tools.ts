@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSy
 import net from "node:net";
 import dns from "node:dns/promises";
 import path from "node:path";
+import { jsonrepair } from "jsonrepair";
 import { readSkillMeta, SKILL_FILE } from "../skill.js";
 import { listMail, markMailRead, sendMail } from "./mailbox.js";
 
@@ -20,8 +21,8 @@ export interface ToolContext {
    * When absent, shell commands run without confirmation.
    */
   confirmShell?: (command: string) => Promise<boolean>;
-  /** Peer harnesses available for agent_send/agent_inbox (name → env root). */
-  peers?: { name: string; envRoot: string }[];
+  /** Peer harnesses available for agent_send/agent_inbox. envRoot present = same machine (direct write); absent = remote peer (message lands in own outbox for mail sync). */
+  peers?: { name: string; envRoot?: string }[];
 }
 
 export interface ToolResult {
@@ -524,15 +525,18 @@ const agentSendTool: ToolContext2 = {
     if (message.trim().length === 0) return { ok: false, output: "message is required" };
     const explicitSubject = typeof args.subject === "string" && args.subject.trim().length > 0 ? args.subject.trim() : "";
     const subject = explicitSubject || (message.split("\n")[0] ?? "").slice(0, 80) || "(no subject)";
+    // Same machine: write straight into the peer mailbox (instant). Remote
+    // peer: write into our own mailbox as an outbox; `mail sync` ferries it.
+    const sameMachine = peer.envRoot !== undefined;
     const id = sendMail({
       fromEnv: context.envName ?? "",
       fromRoot: context.envRoot,
       toEnv: to,
-      toRoot: peer.envRoot,
+      toRoot: sameMachine ? (peer.envRoot as string) : context.envRoot,
       subject,
       body: message,
     });
-    return { ok: true, output: `message ${id} delivered to peer '${to}'` };
+    return { ok: true, output: sameMachine ? `message ${id} delivered to peer '${to}'` : `message ${id} queued for peer '${to}' (delivered by mail sync)` };
   },
 };
 
@@ -554,11 +558,33 @@ const agentInboxTool: ToolContext2 = {
     const rendered = messages
       .map((message) => {
         const state = message.read ? "[read]" : "[unread]";
-        return `${state} ${message.id} from=${message.from} subject=${message.subject}\n${message.body.slice(0, 2000)}`;
+        const kind = message.type === "receipt" ? "[receipt] " : "";
+        return `${kind}${state} ${message.id} from=${message.from} subject=${message.subject}\n${message.body.slice(0, 2000)}`;
       })
       .join("\n---\n");
+    // Read receipts: reading a normal unread message from a peer automatically
+    // acknowledges it. Receipts never generate receipts, so the bus cannot loop.
     for (const message of messages) {
-      if (!message.read) markMailRead(context.envRoot, message.id);
+      if (message.read) continue;
+      markMailRead(context.envRoot, message.id);
+      const peer = (context.peers ?? []).find((candidate) => candidate.name === message.from);
+      if (message.type !== "receipt" && peer) {
+        try {
+          sendMail({
+            fromEnv: context.envName ?? "",
+            fromRoot: context.envRoot,
+            toEnv: message.from,
+            // Same-machine peer: straight into its mailbox; remote peer: our
+            // own outbox (mail sync ferries it).
+            toRoot: peer.envRoot ?? context.envRoot,
+            subject: `Re: ${message.subject}`,
+            body: `read receipt: ${message.id}`,
+            type: "receipt",
+          });
+        } catch {
+          // Receipt best-effort; never blocks reading.
+        }
+      }
     }
     return { ok: true, output: truncate(rendered) };
   },
@@ -654,13 +680,14 @@ export async function executeTool(
     };
     let parsed = parseArgs(call.function.arguments);
     if (parsed === null) {
-      // Models occasionally emit `{to": "x"}` — a key missing its opening
-      // quote. Repair that exact shape before giving up: `[{,] key":` → `{"key":`.
-      const repaired = call.function.arguments.replace(
-        /([{,]\s*)([A-Za-z_][A-Za-z0-9_-]*)(")/g,
-        '$1"$2$3',
-      );
-      parsed = parseArgs(repaired);
+      // Models degrade on long conversations: unquoted keys, missing quotes,
+      // truncated output. jsonrepair fixes the common shapes; whatever it
+      // cannot salvage surfaces as the echo-failure below.
+      try {
+        parsed = JSON.parse(jsonrepair(call.function.arguments)) as Record<string, unknown>;
+      } catch {
+        parsed = null;
+      }
     }
     if (parsed === null) {
       // Echo the malformed arguments so the model can see and repair them.

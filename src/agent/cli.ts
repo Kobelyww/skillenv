@@ -332,7 +332,8 @@ async function runAgentCommand(
       try {
         return { name, envRoot: getEnv(name, defaultHome()).root };
       } catch {
-        fail(`peer environment not found: ${name}`);
+        // Not a local environment: treat as a remote peer reachable via mail sync.
+        return { name };
       }
     });
   const compactChars = Number.parseInt(options.compactChars ?? "120000", 10);

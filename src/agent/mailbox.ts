@@ -20,6 +20,10 @@ export interface MailMessage {
   body: string;
   created_at: string;
   read: boolean;
+  /** "receipt" messages acknowledge a read; they never trigger receipts themselves. */
+  type?: "message" | "receipt";
+  /** Set once the message has been exported to a git mailbus (cross-machine). */
+  synced?: boolean;
 }
 
 export function mailboxDir(envRoot: string): string {
@@ -35,9 +39,11 @@ export function sendMail(options: {
   fromEnv: string;
   fromRoot: string;
   toEnv: string;
+  /** Where to write: the peer's mailbox (same machine) or own mailbox as an outbox (cross-machine). */
   toRoot: string;
   subject: string;
   body: string;
+  type?: "message" | "receipt";
 }): string {
   const now = new Date();
   const stamp = now.toISOString().replace(/[-:]/g, "").replace(/\.\d+Z$/, "");
@@ -50,6 +56,7 @@ export function sendMail(options: {
     body: options.body,
     created_at: utcNow(),
     read: false,
+    ...(options.type ? { type: options.type } : {}),
   };
   const dir = mailboxDir(options.toRoot);
   mkdirSync(dir, { recursive: true });
@@ -74,6 +81,16 @@ export function listMail(envRoot: string, options: { unreadOnly?: boolean } = {}
     }
   }
   return messages.sort((a, b) => b.id.localeCompare(a.id));
+}
+
+/** Flag a message as already exported to the mailbus (prevents re-export). */
+export function markMailSynced(envRoot: string, id: string): boolean {
+  const file = messageFile(envRoot, id);
+  if (!existsSync(file)) return false;
+  const message = JSON.parse(readFileSync(file, "utf8")) as MailMessage;
+  message.synced = true;
+  writeFileSync(file, `${JSON.stringify(message, null, 2)}\n`, "utf8");
+  return true;
 }
 
 /** Mark one message read. Returns false when the id is unknown. */
@@ -104,4 +121,25 @@ export function deleteMail(envRoot: string, id: string): boolean {
   if (!existsSync(file)) return false;
   unlinkSync(file);
   return true;
+}
+
+/**
+ * Delete old messages: by default only already-read ones older than
+ * `maxAgeDays`. With `includeUnread`, unread messages are pruned too.
+ * Returns the number of deleted files.
+ */
+export function pruneMail(
+  envRoot: string,
+  options: { maxAgeDays?: number; includeUnread?: boolean } = {},
+): number {
+  const maxAgeDays = options.maxAgeDays ?? 30;
+  const cutoff = Date.now() - maxAgeDays * 24 * 60 * 60 * 1000;
+  let deleted = 0;
+  for (const message of listMail(envRoot)) {
+    const created = Date.parse(message.created_at);
+    if (Number.isNaN(created) || created > cutoff) continue;
+    if (!message.read && !options.includeUnread) continue;
+    if (deleteMail(envRoot, message.id)) deleted += 1;
+  }
+  return deleted;
 }

@@ -3,7 +3,8 @@ import process from "node:process";
 import { Command } from "commander";
 import pc from "picocolors";
 import { ADAPTERS, getAdapter, type AdapterSpec } from "./adapter.js";
-import { deleteMail, listMail, readMail, sendMail } from "./agent/mailbox.js";
+import { deleteMail, listMail, pruneMail, readMail, sendMail } from "./agent/mailbox.js";
+import { syncMailboxes } from "./mail-sync.js";
 import { defaultHome } from "./config.js";
 import {
   cloneEnv,
@@ -586,6 +587,34 @@ mailApp
     const env = mustGetEnv(envName);
     if (!deleteMail(env.root, id)) fail(`message not found: ${id}`);
     process.stdout.write(`deleted ${id}\n`);
+  });
+
+mailApp
+  .command("prune <env>")
+  .description("Delete old messages (read ones older than --days; --all includes unread).")
+  .option("-d, --days <n>", "Age threshold in days.", "30")
+  .option("-a, --all", "Include unread messages.", false)
+  .action((envName: string, options: { days?: string; all?: boolean }) => {
+    const env = mustGetEnv(envName);
+    const days = Number.parseInt(options.days ?? "30", 10);
+    if (Number.isNaN(days) || days < 0) fail(`invalid --days: ${options.days}`);
+    const deleted = pruneMail(env.root, { maxAgeDays: days, includeUnread: options.all ?? false });
+    process.stdout.write(`pruned ${deleted} message${deleted === 1 ? "" : "s"} from ${env.name}\n`);
+  });
+
+mailApp
+  .command("sync <remote>")
+  .description("Two-way sync of all environment mailboxes with a git remote (cross-machine).")
+  .option("-m, --message <text>", "Commit message for this sync round.")
+  .action((remote: string, options: { message?: string }) => {
+    try {
+      const outcome = syncMailboxes(defaultHome(), remote, { message: options.message });
+      process.stdout.write(
+        `synced: imported ${outcome.imported}, exported ${outcome.exported} message(s); ${outcome.commits} commit(s)\nbus: ${outcome.workdir}\n`,
+      );
+    } catch (error) {
+      fail((error as Error).message);
+    }
   });
 
 program.parseAsync(process.argv).catch((error: unknown) => {

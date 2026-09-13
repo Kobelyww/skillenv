@@ -18,7 +18,7 @@ export interface Env {
 }
 
 /** Directories every environment starts with. */
-export const ENV_SUBDIRS = ["skills", "plugins", "sessions", "log"] as const;
+export const ENV_SUBDIRS = ["skills", "plugins", "sessions", "log", "mailbox"] as const;
 
 export function validateEnvName(name: string): string {
   if (name.length === 0) {

@@ -140,10 +140,31 @@ skillenv agent reviewer --peers worker --dir ~/proj -q "Check agent_inbox, revie
 - Mailboxes live at `<env>/mailbox/` — one JSON file per message
   (from/to/subject/body/read), no server involved.
 - `--peers env1,env2` declares which environments the agent can message;
-  peers are announced in the system prompt.
+  peers are announced in the system prompt. A peer whose environment does
+  not exist locally is treated as remote: messages land in the outbox.
 - Humans share the bus: `skillenv mail send/list/read/delete <env> …`.
 - Keep `agent_send` bodies a single JSON string — malformed arguments are
-  echoed back so the model can repair them.
+  repaired (jsonrepair) or echoed back so the model can retry.
+
+### Cross-machine sync
+
+```bash
+skillenv mail sync git@github.com:me/mailbus.git     # or a local bare repo path
+```
+
+Two-way sync of **all** environment mailboxes over a plain git remote
+(working checkout under `~/.skillenv/mailbus`). Messages addressed to a peer
+environment are exported into `bus/<peer>/` exactly once (`synced` flag);
+each machine's sync imports what is addressed to its own environments.
+Message files are unique, so concurrent machines merge without conflicts.
+Run it from cron or before/after agent sessions.
+
+### Housekeeping
+
+```bash
+skillenv mail prune <env>                # delete read messages older than 30 days
+skillenv mail prune <env> --days 7 --all # including unread
+```
 
 ## Evaluation suites
 

@@ -304,9 +304,9 @@ describe("agent end-to-end through the CLI", () => {
     const workerMail = path.join(HOME, "envs", "mail-worker", "mailbox");
     expect(existsSync(workerMail)).toBe(true);
     const workerFiles = readdirSync(workerMail).filter((f) => f.endsWith(".json"));
-    const ack = JSON.parse(readFileSync(path.join(workerMail, workerFiles[0] as string), "utf8"));
-    expect(ack.from).toBe("mail-peer");
-    expect(ack.body).toContain("acknowledged");
+    const bodies = workerFiles.map((f) => readFileSync(path.join(workerMail, f), "utf8"));
+    expect(bodies.some((text) => text.includes("acknowledged"))).toBe(true);
+    expect(bodies.every((text) => JSON.parse(text).from === "mail-peer")).toBe(true);
   });
 
   it("streams errors clearly when the provider is unreachable", async () => {
