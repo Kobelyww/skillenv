@@ -57,6 +57,7 @@ interface AgentCliOptions {
   dir?: string;
   skills?: string;
   systemExtra?: string;
+  peers?: string;
   session?: string;
   continueSession?: boolean;
   confirmShell?: boolean;
@@ -85,6 +86,7 @@ export function registerAgentCommands(program: Command): void {
     .option("--dir <path>", "Working directory for tools (default: current directory).")
     .option("--skills <names>", "Comma-separated skill names to inline into the system prompt.")
     .option("--system-extra <text>", "Extra instructions appended to the agent system prompt.")
+    .option("--peers <envs>", "Comma-separated peer environment names this agent can message.")
     .option("-s, --session <id>", "Reuse an existing session.")
     .option("-c, --continue", "Continue the most recent session.", false)
     .option("-q, --quiet", "Suppress tool rendering (assistant text only).", false)
@@ -322,6 +324,17 @@ async function runAgentCommand(
   session.provider = provider.id;
   session.model = provider.model;
 
+  const peers = (options.peers ?? "")
+    .split(",")
+    .map((name) => name.trim())
+    .filter(Boolean)
+    .map((name: string) => {
+      try {
+        return { name, envRoot: getEnv(name, defaultHome()).root };
+      } catch {
+        fail(`peer environment not found: ${name}`);
+      }
+    });
   const compactChars = Number.parseInt(options.compactChars ?? "120000", 10);
   const agentOptions = {
     envRoot: env.root,
@@ -330,6 +343,7 @@ async function runAgentCommand(
     fallbackProvider,
     tools: toolAllowlist.length > 0 ? toolAllowlist : undefined,
     confirmShell,
+    peers,
     workdir,
     inlineSkills,
     systemExtra: options.systemExtra,

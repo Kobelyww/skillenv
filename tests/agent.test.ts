@@ -322,6 +322,54 @@ describe("tools", () => {
     expect(empty.output).toBe("(memory is empty)");
   });
 
+  it("agent_send delivers to a peer mailbox and agent_inbox reads it back", async () => {
+    const envA = createEnv("mail-a", HOME);
+    const envB = createEnv("mail-b", HOME);
+    const tools = defaultTools();
+    const ctxA = { workdir, envRoot: envA.root, envName: "mail-a", peers: [{ name: "mail-b", envRoot: envB.root }] };
+
+    const send = await executeTool(tools, ctxA, {
+      id: "s1",
+      type: "function",
+      function: { name: "agent_send", arguments: JSON.stringify({ to: "mail-b", message: "please review src/a.ts" }) },
+    });
+    expect(send.ok).toBe(true);
+    expect(send.output).toContain("delivered");
+
+    // Unknown peers are rejected with the available list.
+    const bad = await executeTool(tools, ctxA, {
+      id: "s2",
+      type: "function",
+      function: { name: "agent_send", arguments: JSON.stringify({ to: "nowhere", message: "y" }) },
+    });
+    expect(bad.ok).toBe(false);
+    expect(bad.output).toContain("available peers: mail-b");
+
+    // The peer reads it from its own inbox; read marks it as read.
+    const ctxB = { workdir, envRoot: envB.root, envName: "mail-b" };
+    const inbox = await executeTool(tools, ctxB, {
+      id: "s3",
+      type: "function",
+      function: { name: "agent_inbox", arguments: "{}" },
+    });
+    expect(inbox.ok).toBe(true);
+    expect(inbox.output).toContain("subject=please review src/a.ts");
+    expect(inbox.output).toContain("please review src/a.ts");
+
+    const again = await executeTool(tools, ctxB, {
+      id: "s4",
+      type: "function",
+      function: { name: "agent_inbox", arguments: "{}" },
+    });
+    expect(again.output).toBe("(mailbox empty)");
+    const all = await executeTool(tools, ctxB, {
+      id: "s5",
+      type: "function",
+      function: { name: "agent_inbox", arguments: JSON.stringify({ all: true }) },
+    });
+    expect(all.output).toContain("[read]");
+  });
+
   it("exposes schemas for every tool", () => {
     const schemas = toolSchemas(defaultTools());
     const names = schemas.map((schema) => schema.function.name);

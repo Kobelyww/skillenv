@@ -3,6 +3,7 @@ import process from "node:process";
 import { Command } from "commander";
 import pc from "picocolors";
 import { ADAPTERS, getAdapter, type AdapterSpec } from "./adapter.js";
+import { deleteMail, listMail, readMail, sendMail } from "./agent/mailbox.js";
 import { defaultHome } from "./config.js";
 import {
   cloneEnv,
@@ -12,6 +13,7 @@ import {
   removeEnv,
   renameEnv,
 } from "./env.js";
+import { readFileSync } from "node:fs";
 import { checkEnv, describeEnv, diffEnvs, providerReadiness } from "./inspect.js";
 import { installSpecs } from "./installer.js";
 import { exportManifest, loadManifestFile, readManifest, writeManifest } from "./manifest.js";
@@ -517,6 +519,74 @@ pluginApp
 
 // Built-in coding agent (provider-agnostic OpenAI-compatible harness).
 registerAgentCommands(program);
+
+const mailApp = program.command("mail").description("Read and send cross-environment mailbox messages (the agent bus humans can use too).");
+
+mailApp
+  .command("send <env> <to> <subject...>")
+  .description("Send a message into another environment's mailbox (same skillenv home).")
+  .option("--body <text>", "Message body (prompt for stdin when omitted).")
+  .action((envName: string, to: string, subjectParts: string[], options: { body?: string }) => {
+    const from = mustGetEnv(envName);
+    const toEnv = mustGetEnv(to);
+    try {
+      let body = options.body ?? "";
+      if (body.length === 0) {
+        body = readFileSync(0, "utf8");
+      }
+      const id = sendMail({
+        fromEnv: from.name,
+        fromRoot: from.root,
+        toEnv: toEnv.name,
+        toRoot: toEnv.root,
+        subject: subjectParts.join(" "),
+        body: body.trim(),
+      });
+      process.stdout.write(`sent ${id}: ${from.name} -> ${toEnv.name}\n`);
+    } catch (error) {
+      fail((error as Error).message);
+    }
+  });
+
+mailApp
+  .command("list <env>")
+  .description("List mailbox messages (newest first; unread only by default).")
+  .option("-a, --all", "Include already-read messages.", false)
+  .action((envName: string, options: { all?: boolean }) => {
+    const env = mustGetEnv(envName);
+    const messages = listMail(env.root, { unreadOnly: !options.all });
+    if (messages.length === 0) {
+      process.stdout.write("(mailbox empty)\n");
+      return;
+    }
+    for (const message of messages) {
+      const state = message.read ? "read  " : "unread";
+      process.stdout.write(`${state}\t${message.id}\t${message.from}\t${message.subject}\n`);
+    }
+  });
+
+mailApp
+  .command("read <env> <id>")
+  .description("Print one message (marks it read).")
+  .action((envName: string, id: string) => {
+    const env = mustGetEnv(envName);
+    try {
+      const message = readMail(env.root, id);
+      if (!message) fail(`message not found: ${id}`);
+      process.stdout.write(`from: ${message?.from}\nsubject: ${message?.subject}\n\n${message?.body}\n`);
+    } catch (error) {
+      fail((error as Error).message);
+    }
+  });
+
+mailApp
+  .command("delete <env> <id>")
+  .description("Delete one mailbox message.")
+  .action((envName: string, id: string) => {
+    const env = mustGetEnv(envName);
+    if (!deleteMail(env.root, id)) fail(`message not found: ${id}`);
+    process.stdout.write(`deleted ${id}\n`);
+  });
 
 program.parseAsync(process.argv).catch((error: unknown) => {
   fail(error instanceof Error ? error.message : String(error));

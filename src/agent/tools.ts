@@ -4,12 +4,15 @@ import net from "node:net";
 import dns from "node:dns/promises";
 import path from "node:path";
 import { readSkillMeta, SKILL_FILE } from "../skill.js";
+import { listMail, markMailRead, sendMail } from "./mailbox.js";
 
 export interface ToolContext {
   /** Working directory for relative paths and shell commands. */
   workdir: string;
   /** Environment root (skills live in <envRoot>/skills). */
   envRoot: string;
+  /** Environment display name (mailbox sender identity). */
+  envName?: string;
   /** Shell command timeout in milliseconds. */
   commandTimeoutMs?: number;
   /**
@@ -17,6 +20,8 @@ export interface ToolContext {
    * When absent, shell commands run without confirmation.
    */
   confirmShell?: (command: string) => Promise<boolean>;
+  /** Peer harnesses available for agent_send/agent_inbox (name → env root). */
+  peers?: { name: string; envRoot: string }[];
 }
 
 export interface ToolResult {
@@ -495,6 +500,70 @@ const memoryWriteTool: ToolContext2 = {
   },
 };
 
+const agentSendTool: ToolContext2 = {
+  name: "agent_send",
+  description:
+    'Send a message to a peer harness (another skillenv agent in a different environment). Arguments: {"to": "<peer env name>", "message": "<your full message text>"}. Keep message a single JSON string (escape inner quotes). Use for delegation, handoffs, and coordination.',
+  parameters: {
+    type: "object",
+    properties: {
+      to: { type: "string", description: "Peer environment name (must be one of the declared peers)." },
+      message: { type: "string", description: "Full message text (subject and body in one string)." },
+      subject: { type: "string", description: "Optional short subject line; defaults to the first line of message." },
+    },
+    required: ["to", "message"],
+  },
+  execute: (args, context) => {
+    const to = typeof args.to === "string" ? args.to : "";
+    const peer = (context.peers ?? []).find((candidate) => candidate.name === to);
+    if (!peer) {
+      const known = (context.peers ?? []).map((candidate) => candidate.name).join(", ") || "none";
+      return { ok: false, output: `unknown peer '${to}'; available peers: ${known}` };
+    }
+    const message = typeof args.message === "string" ? args.message : "";
+    if (message.trim().length === 0) return { ok: false, output: "message is required" };
+    const explicitSubject = typeof args.subject === "string" && args.subject.trim().length > 0 ? args.subject.trim() : "";
+    const subject = explicitSubject || (message.split("\n")[0] ?? "").slice(0, 80) || "(no subject)";
+    const id = sendMail({
+      fromEnv: context.envName ?? "",
+      fromRoot: context.envRoot,
+      toEnv: to,
+      toRoot: peer.envRoot,
+      subject,
+      body: message,
+    });
+    return { ok: true, output: `message ${id} delivered to peer '${to}'` };
+  },
+};
+
+const agentInboxTool: ToolContext2 = {
+  name: "agent_inbox",
+  description:
+    "Check your mailbox for messages from peer harnesses. Unread messages are returned and marked read.",
+  parameters: {
+    type: "object",
+    properties: {
+      all: { type: "boolean", description: "Include already-read messages." },
+    },
+    required: [],
+  },
+  execute: (args, context) => {
+    const includeAll = args.all === true;
+    const messages = listMail(context.envRoot, { unreadOnly: !includeAll });
+    if (messages.length === 0) return { ok: true, output: "(mailbox empty)" };
+    const rendered = messages
+      .map((message) => {
+        const state = message.read ? "[read]" : "[unread]";
+        return `${state} ${message.id} from=${message.from} subject=${message.subject}\n${message.body.slice(0, 2000)}`;
+      })
+      .join("\n---\n");
+    for (const message of messages) {
+      if (!message.read) markMailRead(context.envRoot, message.id);
+    }
+    return { ok: true, output: truncate(rendered) };
+  },
+};
+
 const skillListTool: ToolContext2 = {
   name: "skill_list",
   description: "List the skills installed in the current skillenv environment with their descriptions.",
@@ -553,6 +622,8 @@ export function defaultTools(): ToolContext2[] {
     skillReadTool,
     memoryReadTool,
     memoryWriteTool,
+    agentSendTool,
+    agentInboxTool,
   ];
 }
 
@@ -577,7 +648,11 @@ export async function executeTool(
     try {
       args = JSON.parse(call.function.arguments) as Record<string, unknown>;
     } catch (error) {
-      return { ok: false, output: `tool arguments are not valid JSON: ${(error as Error).message}` };
+      // Echo the malformed arguments so the model can see and repair them.
+      return {
+        ok: false,
+        output: `tool arguments are not valid JSON: ${(error as Error).message}\nyou sent: ${truncate(call.function.arguments, 400)}\nFix the JSON (escape inner quotes) and retry.`,
+      };
     }
   }
   try {

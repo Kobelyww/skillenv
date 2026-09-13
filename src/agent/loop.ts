@@ -24,6 +24,8 @@ export interface AgentOptions {
   tools?: string[];
   /** Ask before every shell command (see ToolContext.confirmShell). */
   confirmShell?: (command: string) => Promise<boolean>;
+  /** Peer harnesses this agent can message via agent_send. */
+  peers?: { name: string; envRoot: string }[];
   workdir: string;
   /** Skill names to inline fully in the system prompt (others are listed + on-demand). */
   inlineSkills?: string[];
@@ -141,6 +143,12 @@ export function buildSystemPrompt(options: AgentOptions): string {
     "- web_fetch reaches public URLs only (private networks are blocked).",
     "- Skills installed in this environment are domain playbooks. Use skill_list to see them and skill_read to load one before following it.",
     "- You have persistent memory across sessions (memory_read/memory_write). At the start of a task, read memory if it may hold relevant context; when the user states a durable preference or a task ends with a reusable lesson, record it with memory_write. Never store secrets there.",
+    ...(options.peers && options.peers.length > 0
+      ? [
+          `- Peer harnesses are running in other environments: ${options.peers.map((peer) => peer.name).join(", ")}.`,
+          "  Coordinate with agent_send (to/subject/body) and check agent_inbox for their replies.",
+        ]
+      : []),
     "- When a task is complete, summarize concisely what changed and how you verified it.",
   ];
 
@@ -221,7 +229,9 @@ export async function runAgentTurn(
   const context: ToolContext = {
     workdir: options.workdir,
     envRoot: options.envRoot,
+    envName: options.envName,
     confirmShell: options.confirmShell,
+    peers: options.peers,
   };
   const maxIterations = options.maxIterations ?? 25;
 

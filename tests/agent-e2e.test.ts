@@ -10,6 +10,7 @@ let HOME = "";
 let projectDir = "";
 let server: http.Server;
 let anthropicServerRef: http.Server | null = null;
+const servers: http.Server[] = [];
 let providerUrl = "";
 let anthropicUrl = "";
 let requestsSeen = 0;
@@ -130,9 +131,10 @@ function agent(
   args: string[],
   timeoutMs = 30_000,
   providerEnv: Record<string, string> = {},
+  envName = "agent-e2e",
 ): Promise<{ code: number; stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
-    const child = spawn("node", [path.join(ROOT, "dist", "cli.js"), "agent", "agent-e2e", ...args], {
+    const child = spawn("node", [path.join(ROOT, "dist", "cli.js"), "agent", envName, ...args], {
       cwd: projectDir,
       env: { ...CHILD_ENV, SKILLENV_HOME: HOME, OPENAI_BASE_URL: providerUrl, ...providerEnv },
       stdio: ["ignore", "pipe", "pipe"],
@@ -211,6 +213,100 @@ describe("agent end-to-end through the CLI", () => {
     const result = await agent(["-q", "hi", "--dir", "/nonexistent/dir/xyz"]);
     expect(result.code).toBe(1);
     expect(result.stderr).toContain("workdir does not exist");
+  });
+
+  it("two agent harnesses coordinate over the mailbox", { timeout: 180_000 }, async () => {
+    // Deterministic scripted provider: write result -> agent_send -> summary,
+    // then for the peer: inbox read -> reply -> summary.
+    const mk1 = spawnSync("node", [path.join(ROOT, "dist", "cli.js"), "create", "mail-worker"], {
+      env: { ...process.env, SKILLENV_HOME: HOME },
+      encoding: "utf8",
+    });
+
+    const mk2 = spawnSync("node", [path.join(ROOT, "dist", "cli.js"), "create", "mail-peer"], {
+      env: { ...process.env, SKILLENV_HOME: HOME },
+      encoding: "utf8",
+    });
+
+
+    // Simpler: two servers with the branch logic distinguished by a flag.
+    const makeServer = (isWorker: boolean): Promise<string> =>
+      new Promise((resolve) => {
+        const srv = http.createServer((req, res) => {
+          let body = "";
+          req.on("data", (c) => (body += c));
+          req.on("end", () => {
+            const parsed = JSON.parse(body) as { messages: { role: string; content: string | null; tool_calls?: { function: { name: string } }[] }[] };
+            const last = parsed.messages.at(-1);
+            const lastTool = last?.role === "tool" ? last.name : undefined;
+            res.writeHead(200, { "Content-Type": "text/event-stream" });
+            const toolCall = (id: string, name: string, args: unknown) =>
+              `data: ${JSON.stringify({ choices: [{ delta: { tool_calls: [{ index: 0, id, function: { name, arguments: JSON.stringify(args) } }] }, finish_reason: "tool_calls" }] })}\n\n`;
+            const text = (t: string) =>
+              `data: ${JSON.stringify({ choices: [{ delta: { content: t }, finish_reason: "stop" }] })}\n\n`;
+            if (isWorker) {
+              if (last?.role === "user") {
+                res.write(toolCall("w1", "write_file", { path: "result.txt", content: "analysis complete" }));
+              } else if (lastTool === "write_file") {
+                res.write(toolCall("w2", "agent_send", { to: "mail-peer", message: "result.txt ready; content: analysis complete" }));
+              } else {
+                res.write(text("Handed off to mail-peer."));
+              }
+            } else {
+              if (last?.role === "user") {
+                res.write(toolCall("p1", "agent_inbox", {}));
+              } else if (lastTool === "agent_inbox") {
+                res.write(toolCall("p2", "agent_send", { to: "mail-worker", message: "acknowledged: result.txt" }));
+              } else {
+                res.write(text("Acknowledged: result.txt"));
+              }
+            }
+            res.end("data: [DONE]\n\n");
+          });
+        });
+        srv.listen(0, "127.0.0.1", () => {
+          resolve(`http://127.0.0.1:${(srv.address() as { port: number }).port}/v1`);
+        });
+        servers.push(srv);
+      });
+
+    const workerUrl = await makeServer(true);
+    const peerUrl = await makeServer(false);
+
+    // Turn 1: worker writes and hands off.
+    const send = await agent(
+      ["--peers", "mail-peer", "-q", "Do the handoff."],
+      60_000,
+      { SKILLENV_AGENT_PROVIDER: "openai", OPENAI_API_KEY: "k", OPENAI_BASE_URL: workerUrl, OPENAI_MODEL: "mock-worker" },
+      "mail-worker",
+    );
+    expect(send.code).toBe(0);
+
+    // The peer mailbox holds the worker's message.
+    const peerMail = path.join(HOME, "envs", "mail-peer", "mailbox");
+    expect(existsSync(peerMail)).toBe(true);
+    const files = readdirSync(peerMail).filter((f) => f.endsWith(".json"));
+    expect(files.length).toBeGreaterThanOrEqual(1);
+    const message = JSON.parse(readFileSync(path.join(peerMail, files[0] as string), "utf8"));
+    expect(message.from).toBe("mail-worker");
+    expect(message.body).toContain("result.txt");
+
+    // Turn 2: peer reads its inbox and replies over the bus.
+    const reply = await agent(
+      ["--peers", "mail-worker", "-q", "Check your inbox and reply."],
+      60_000,
+      { SKILLENV_AGENT_PROVIDER: "openai", OPENAI_API_KEY: "k", OPENAI_BASE_URL: peerUrl, OPENAI_MODEL: "mock-peer" },
+      "mail-peer",
+    );
+    expect(reply.code).toBe(0);
+
+    // The worker's mailbox now holds the peer's acknowledgement.
+    const workerMail = path.join(HOME, "envs", "mail-worker", "mailbox");
+    expect(existsSync(workerMail)).toBe(true);
+    const workerFiles = readdirSync(workerMail).filter((f) => f.endsWith(".json"));
+    const ack = JSON.parse(readFileSync(path.join(workerMail, workerFiles[0] as string), "utf8"));
+    expect(ack.from).toBe("mail-peer");
+    expect(ack.body).toContain("acknowledged");
   });
 
   it("streams errors clearly when the provider is unreachable", async () => {
