@@ -73,4 +73,16 @@ describe("describeEnv / diffEnvs", () => {
     const env = createEnv("adapted", HOME, "claude");
     expect(describeEnv(env.root, env.name).adapter).toBe("claude");
   });
+
+  it("handles quoted adapter values and comments like the manifest parser", () => {
+    const env = createEnv("quoted-adapter", HOME);
+    writeFileSync(
+      path.join(env.root, "skillenv.yml"),
+      'name: quoted-adapter\nadapter: "claude" # inline comment\nskills: []\nplugins: []\n',
+      "utf8",
+    );
+    expect(describeEnv(env.root, env.name).adapter).toBe("claude");
+    expect(checkEnv(env.root, env.name).ok).toBe(true);
+  });
 });
+

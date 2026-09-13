@@ -34,6 +34,9 @@
   for A/B model comparison.
 - `agent-eval --case <name>` runs a single case; `--max-iterations` sets the
   default cap for cases without their own.
+- `doctor`/`env info` parse the manifest adapter with the same YAML reader as
+  the manifest module (quoted values and inline comments no longer break
+  adapter detection).
 - Registry source names are validated (`..`, path separators) so the cache
   filename cannot escape `~/.skillenv/registry-cache` — found by an agent
   review round and confirmed by reproduction.

@@ -2,6 +2,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { getAdapter } from "./adapter.js";
 import { PROVIDERS } from "./agent/providers.js";
+import { readManifest } from "./manifest.js";
 import { directoryChecksum, readLock } from "./lock.js";
 import { listPlugins } from "./plugins.js";
 import { SKILL_FILE } from "./skill.js";
@@ -41,11 +42,10 @@ export function describeEnv(envRoot: string, name: string): EnvSummary {
 }
 
 function readManifestAdapter(envRoot: string): string {
-  const manifestFile = path.join(envRoot, "skillenv.yml");
+  // Parse with the same YAML reader as the manifest module so quoted values
+  // ("claude") and comments behave identically everywhere.
   try {
-    const text = readFileSync(manifestFile, "utf8");
-    const match = /^adapter:\s*(\S+)/m.exec(text);
-    return match?.[1] ?? "codex";
+    return readManifest(envRoot).adapter;
   } catch {
     return "codex";
   }
