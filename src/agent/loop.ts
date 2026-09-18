@@ -255,10 +255,11 @@ function createDelegateTool(options: AgentOptions): ToolContext2 {
           : 12;
 
       const subSession = createSession(options.envRoot, options.envName, options.provider.id, options.provider.model);
-      const subMessages: ChatMessage[] = [
+      const subMessages = subSession.messages;
+      subMessages.push(
         { role: "system", content: buildSystemPrompt(options) + "\n\nYou are a SUBAGENT executing one focused task autonomously. Report the outcome concisely: what you did, files changed, and verification. Do not ask questions." },
         { role: "user", content: context.length > 0 ? `${goal}\n\nContext:\n${context}` : goal },
-      ];
+      );
       try {
         const result = await runAgentTurn(
           { ...options, allowDelegate: false, maxIterations, checkpointDir: options.checkpointDir, checkpointLog: options.checkpointLog },
