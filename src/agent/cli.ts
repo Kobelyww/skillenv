@@ -91,7 +91,7 @@ export function registerAgentCommands(program: Command): void {
     .option("--tools <names>", "Comma-separated tool allowlist (default: all tools).")
     .option("--confirm-shell", "Ask before every shell command (interactive terminals only).", false)
     .option("--no-checkpoints", "Disable file checkpoints (undo).")
-    .option("--no-delegate", "Disable the delegate_task subagent tool.", false)
+    .option("--no-delegate", "Disable the delegate_task subagent tool.")
     .option("--plan", "PLAN MODE: read-only tools; the agent produces a plan instead of changes.", false)
     .option("--dir <path>", "Working directory for tools (default: current directory).")
     .option("--skills <names>", "Comma-separated skill names to inline into the system prompt.")

@@ -153,6 +153,26 @@ with `--no-checkpoints`). In the REPL, `/undo` steps back through the
 session's mutations — restoring previous contents, or removing files the
 agent created.
 
+## Subagent delegation
+
+`delegate_task` (on by default; `--no-delegate` disables) spawns a fresh,
+fully isolated sub-run for a focused subtask: new context, no delegate tool
+(recursion impossible), its own persisted session for audit. Put everything
+the subagent needs into `goal`/`context` — it cannot see your conversation.
+
+## Cost tracking
+
+Token usage is priced per model (built-in table: DeepSeek, Claude, GPT,
+Gemini, GLM) and accumulated per session. Every turn ends with an
+`iterations · tool calls · tokens · $cost` line, and `session list` shows
+cumulative USD. Unknown models track tokens at $0.
+
+## Git integration
+
+REPL `/commit <message>` stages all changes and commits locally (never
+pushes). Without a message, the model drafts a conventional-commit line from
+the diff stat.
+
 ## Plan mode
 
 `skillenv agent <env> --plan` restricts the toolbox to read-only tools and

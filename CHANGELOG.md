@@ -10,6 +10,13 @@
   agents message peers via `agent_send`/`agent_inbox` (declared with
   `--peers`), humans via `skillenv mail send/list/read/delete`. Two-agent
   coordination is covered by a deterministic e2e test and live runs.
+- **Subagent delegation**: `delegate_task` runs focused subtasks in a fully
+  isolated sub-run (no recursion, persisted audit session) and returns the
+  report to the parent agent.
+- **Cost tracking**: per-model pricing table; sessions accumulate estimated
+  USD, shown after each turn and in `session list`.
+- REPL `/commit`: stage all + commit with a model-drafted conventional
+  commit message.
 - **MCP client**: mount external tool servers over stdio JSON-RPC
   (`skillenv mcp add/list/remove/test`; Claude Code compatible
   `~/.skillenv/mcp.json`). Tools appear as `mcp__<server>__<tool>` and merge
