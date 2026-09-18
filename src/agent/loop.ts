@@ -4,7 +4,7 @@ import { getAdapter } from "../adapter.js";
 import { readLock } from "../lock.js";
 import { readSkillMeta, SKILL_FILE } from "../skill.js";
 import { quietRender, type AgentRenderEvents } from "./render.js";
-import { createSession, saveSession, type AgentSession } from "./session.js";
+import { createSession, saveSession } from "./session.js";
 import {
   streamChat,
   ProviderHttpError,
