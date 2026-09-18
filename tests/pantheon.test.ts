@@ -1,5 +1,5 @@
 import { createServer, type Server } from "node:http";
-import { existsSync, mkdtempSync, readFileSync, readdirSync } from "node:fs";
+import { existsSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -78,9 +78,10 @@ function providerFor(god: string): ResolvedProvider {
   return { id: "openai", displayName: "Mock", baseUrl, apiKey: "", model: `mock-${god}` };
 }
 
-function collectSSE(response: Response): Promise<{ events: { event: string; data: any }[]; text: string }> {
+interface SseEvent { event: string; data: Record<string, unknown> & { god?: string; text?: string; name?: string; ok?: boolean; preview?: string; phase?: string; content?: string | null; message?: string } }
+function collectSSE(response: Response): Promise<{ events: SseEvent[]; text: string }> {
   return new Promise((resolve, reject) => {
-    const events: { event: string; data: any }[] = [];
+    const events: SseEvent[] = [];
     const reader = response.body!.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
@@ -248,7 +249,3 @@ describe("pantheon", () => {
     expect(existsSync(path.join(partialGods[0]?.envRoot ?? "", "skills"))).toBe(true);
   });
 });
-
-function existsSyncCheck(): boolean {
-  return existsSync(path.join(HOME, "envs", "hermes"));
-}

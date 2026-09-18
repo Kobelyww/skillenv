@@ -541,7 +541,6 @@ program
     baseUrl?: string; apiKey?: string; port?: string; dir?: string; open?: boolean;
   }) => {
     const { listenPantheon, resolveGods, ensureGodEnv } = await import("./ui/pantheon.js");
-    const { renderPage } = await import("./ui/page.js");
     try {
       const shared = resolveProvider({
         provider: options.provider,
