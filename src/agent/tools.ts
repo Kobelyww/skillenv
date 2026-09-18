@@ -43,7 +43,7 @@ export interface ToolContext2 {
 
 const MAX_OUTPUT = 16_000;
 
-function truncate(text: string, limit = MAX_OUTPUT): string {
+export function truncate(text: string, limit = MAX_OUTPUT): string {
   if (text.length <= limit) return text;
   return `${text.slice(0, limit)}\n... [truncated ${text.length - limit} characters]`;
 }

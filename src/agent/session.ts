@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { utcNow, type LockFile } from "../lock.js";
+import { estimateCost } from "./pricing.js";
 import type { ChatMessage } from "./providers.js";
 
 export interface AgentSession {
@@ -13,6 +14,8 @@ export interface AgentSession {
   messages: ChatMessage[];
   /** Cumulative token usage across every turn in this session (absent when 0). */
   total_usage?: { prompt_tokens: number; completion_tokens: number };
+  /** Cumulative estimated cost in USD (provider pricing table). */
+  total_cost_usd?: number;
 }
 
 /**
@@ -24,12 +27,22 @@ export interface AgentSession {
 export function addSessionUsage(
   session: AgentSession,
   usage: { prompt_tokens: number; completion_tokens: number },
+  model?: string,
 ): void {
   if (usage.prompt_tokens === 0 && usage.completion_tokens === 0) return;
   const total = session.total_usage ?? { prompt_tokens: 0, completion_tokens: 0 };
   total.prompt_tokens += usage.prompt_tokens;
   total.completion_tokens += usage.completion_tokens;
   session.total_usage = total;
+  if (model) {
+    const usd = estimateCost(model, usage);
+    session.total_cost_usd = Number(((session.total_cost_usd ?? 0) + usd).toFixed(6));
+  }
+}
+
+/** Human-readable total cost in USD, or undefined when zero/absent. */
+export function sessionCostUsd(session: AgentSession): number | undefined {
+  return session.total_cost_usd && session.total_cost_usd > 0 ? session.total_cost_usd : undefined;
 }
 
 /** Human-readable total token count, or undefined when the session has none. */

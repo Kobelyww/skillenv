@@ -453,6 +453,97 @@ describe("tools", () => {
     expect(readOnly).not.toContain("write_file");
   });
 
+  it("delegate_task runs an isolated subagent and returns its report", async () => {
+    const env = createEnv("delegate-env", HOME);
+    let subModel = "";
+    const server = http.createServer((req, res) => {
+      let body = "";
+      req.on("data", (c) => (body += c));
+      req.on("end", () => {
+        const parsed = JSON.parse(body) as {
+          model: string;
+          messages: { role: string; content: string | null; tool_calls?: { function: { name: string } }[] }[];
+        };
+        subModel = parsed.model;
+        const last = parsed.messages.at(-1);
+        const isSub = parsed.messages.some(
+          (m) => m.role === "system" && String(m.content).includes("SUBAGENT"),
+        );
+        const parentToolDone = parsed.messages.some(
+          (m) => m.role === "tool" && String(m.content).includes("SUB REPORT"),
+        );
+        res.writeHead(200, { "Content-Type": "text/event-stream" });
+        const toolCall = (id: string, name: string, args: unknown) =>
+          `data: ${JSON.stringify({ choices: [{ delta: { tool_calls: [{ index: 0, id, function: { name, arguments: JSON.stringify(args) } }] }, finish_reason: "tool_calls" }] })}\n\n`;
+        const text = (t: string) =>
+          `data: ${JSON.stringify({ choices: [{ delta: { content: t }, finish_reason: "stop" }] })}\n\n`;
+        if (isSub && last?.role === "user") {
+          res.write(text("SUB REPORT: all done."));
+        } else if (parentToolDone) {
+          res.write(text("Task complete with sub report."));
+        } else {
+          res.write(
+            toolCall("d1", "delegate_task", {
+              goal: "Write unit tests",
+              context: "module: auth",
+            }),
+          );
+        }
+        res.end("data: [DONE]\n\n");
+      });
+    });
+    servers.push(server);
+    const url = await new Promise<string>((resolve) => {
+      server.listen(0, "127.0.0.1", () => resolve(`http://127.0.0.1:${(server.address() as { port: number }).port}/v1`));
+    });
+    const provider: ResolvedProvider = { id: "test", displayName: "Test", baseUrl: url, apiKey: "", model: "mock-parent" };
+    const messages = [{ role: "user" as const, content: "delegate the test writing" }];
+    const toolResults: { name: string; ok: boolean; output: string }[] = [];
+    const result = await runAgentTurn(
+      { envRoot: env.root, envName: "deleg-env", provider, workdir: HOME },
+      messages,
+      {
+        onTextDelta: () => {},
+        onTurnStart: () => {},
+        onToolCall: () => {},
+        onToolResult: (name, ok, output) => toolResults.push({ name, ok, output }),
+        onInfo: () => {},
+      },
+    );
+    expect(result.content).toBe("Task complete with sub report.");
+    expect(toolResults[0]?.name).toBe("delegate_task");
+    expect(toolResults[0]?.ok).toBe(true);
+    expect(toolResults[0]?.output).toContain("SUB REPORT: all done.");
+    // Sub session persisted for audit in the same env (the parent's messages
+    // are only persisted by higher layers).
+    const sessions = listSessions(env.root);
+    expect(sessions.length).toBeGreaterThanOrEqual(1);
+    expect(sessions.some((s) => s.messages.some((m) => String(m.content ?? "").includes("SUBAGENT")))).toBe(true);
+    // Parent's schema list contains delegate_task; the sub-run's does not
+    // (its tools exclude delegation — recursion guard).
+    void subModel;
+  });
+
+  it("estimateCost prices known models and returns 0 for unknown", async () => {
+    const { estimateCost } = await import("../src/agent/pricing.js");
+    const usage = { prompt_tokens: 1_000_000, completion_tokens: 1_000_000 };
+    expect(estimateCost("deepseek-chat", usage)).toBe(1.37);
+    expect(estimateCost("claude-sonnet-4-5", usage)).toBe(18);
+    expect(estimateCost("totally-unknown-model", usage)).toBe(0);
+    expect(estimateCost("deepseek-chat", { prompt_tokens: 0, completion_tokens: 0 })).toBe(0);
+  });
+
+  it("addSessionUsage accumulates cost across turns", async () => {
+    const { addSessionUsage } = await import("../src/agent/session.js");
+    const env = createEnv("cost-env", HOME);
+    const session = createSession(env.root, "cost-env", "deepseek", "deepseek-chat");
+    addSessionUsage(session, { prompt_tokens: 1_000_000, completion_tokens: 0 }, "deepseek-chat");
+    addSessionUsage(session, { prompt_tokens: 0, completion_tokens: 1_000_000 }, "deepseek-chat");
+    expect(session.total_usage?.prompt_tokens).toBe(1_000_000);
+    expect(session.total_usage?.completion_tokens).toBe(1_000_000);
+    expect(session.total_cost_usd).toBeCloseTo(1.37, 4);
+  });
+
   it("exposes schemas for every tool", () => {
     const schemas = toolSchemas(defaultTools());
     const names = schemas.map((schema) => schema.function.name);

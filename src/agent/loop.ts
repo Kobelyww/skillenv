@@ -3,7 +3,8 @@ import path from "node:path";
 import { getAdapter } from "../adapter.js";
 import { readLock } from "../lock.js";
 import { readSkillMeta, SKILL_FILE } from "../skill.js";
-import type { AgentRenderEvents } from "./render.js";
+import { quietRender, type AgentRenderEvents } from "./render.js";
+import { createSession, saveSession, type AgentSession } from "./session.js";
 import {
   streamChat,
   ProviderHttpError,
@@ -12,7 +13,8 @@ import {
   type ResolvedProvider,
   type ToolCall,
 } from "./providers.js";
-import { defaultTools, executeTool, toolSchemas, type ToolContext } from "./tools.js";
+import { defaultTools, executeTool, toolSchemas, truncate, type ToolContext, type ToolContext2 } from "./tools.js";
+import { estimateCost } from "./pricing.js";
 
 export interface AgentOptions {
   envRoot: string;
@@ -21,6 +23,10 @@ export interface AgentOptions {
   /** Checkpoints: snapshot files under this dir before write/edit mutations. */
   checkpointDir?: string;
   checkpointLog?: string;
+  /** Allow the delegate_task tool (subagent delegation). Default true; sub-runs always disable it. */
+  allowDelegate?: boolean;
+  /** Marks a sub-run (prevents nested delegation). */
+  subagent?: boolean;
   /** Failover target when the primary provider fails before any output. */
   fallbackProvider?: ResolvedProvider;
   /** Restrict the toolbox; default is all tools. Unknown names are ignored. */
@@ -130,6 +136,8 @@ export interface AgentTurnResult {
   toolNames: string[];
   iterations: number;
   usage: { prompt_tokens: number; completion_tokens: number };
+  /** Estimated USD cost for this turn (0 for unknown pricing). */
+  costUsd: number;
 }
 
 /** Build the system prompt: role, workspace, adapter, and skill inventory. */
@@ -219,6 +227,57 @@ function inlineSkillText(options: AgentOptions): string {
 }
 
 /**
+ * The delegate_task tool: spawns a fully isolated sub-run of the agent loop
+ * (fresh messages, no delegate tool — recursion impossible) and returns its
+ * final report as the tool output. The sub-session is persisted for audit.
+ */
+function createDelegateTool(options: AgentOptions): ToolContext2 {
+  return {
+    name: "delegate_task",
+    description:
+      "Delegate a focused subtask to a fresh subagent (same skills and tools, isolated context). Use for self-contained subtasks like 'write tests for X' or 'research Y and report'. The subagent cannot see this conversation; put everything it needs into goal/context.",
+    parameters: {
+      type: "object",
+      properties: {
+        goal: { type: "string", description: "The complete task for the subagent." },
+        context: { type: "string", description: "Optional background: file paths, constraints, prior findings." },
+        max_iterations: { type: "number", description: "Max tool-loop iterations for the subagent (default 12)." },
+      },
+      required: ["goal"],
+    },
+    execute: async (args) => {
+      const goal = typeof args.goal === "string" ? args.goal.trim() : "";
+      if (goal.length === 0) return { ok: false, output: "goal is required" };
+      const context = typeof args.context === "string" ? args.context : "";
+      const maxIterations =
+        typeof args.max_iterations === "number" && args.max_iterations > 0
+          ? Math.floor(args.max_iterations)
+          : 12;
+
+      const subSession = createSession(options.envRoot, options.envName, options.provider.id, options.provider.model);
+      const subMessages: ChatMessage[] = [
+        { role: "system", content: buildSystemPrompt(options) + "\n\nYou are a SUBAGENT executing one focused task autonomously. Report the outcome concisely: what you did, files changed, and verification. Do not ask questions." },
+        { role: "user", content: context.length > 0 ? `${goal}\n\nContext:\n${context}` : goal },
+      ];
+      try {
+        const result = await runAgentTurn(
+          { ...options, allowDelegate: false, maxIterations, checkpointDir: options.checkpointDir, checkpointLog: options.checkpointLog },
+          subMessages,
+          quietRender(),
+        );
+        saveSession(options.envRoot, subSession);
+        return {
+          ok: true,
+          output: truncate(result.content.length > 0 ? result.content : "(subagent produced no summary)", 4000),
+        };
+      } catch (error) {
+        return { ok: false, output: `subagent failed: ${(error as Error).message.slice(0, 300)}` };
+      }
+    },
+  };
+}
+
+/**
  * Run one user request through the tool-calling loop until the model answers
  * without tool calls or `maxIterations` is reached. Streams text deltas via
  * `render`.
@@ -229,6 +288,10 @@ export async function runAgentTurn(
   render: AgentRenderEvents,
 ): Promise<AgentTurnResult> {
   const allTools = [...defaultTools(), ...(options.extraTools ?? [])];
+  const allowDelegate = options.allowDelegate !== false && !options.subagent;
+  if (allowDelegate) {
+    allTools.push(createDelegateTool(options));
+  }
   const tools = options.tools ? allTools.filter((tool) => options.tools?.includes(tool.name)) : allTools;
   const schemas = toolSchemas(tools);
   const context: ToolContext = {
@@ -379,6 +442,7 @@ export async function runAgentTurn(
         toolNames,
         iterations: iteration,
         usage,
+        costUsd: estimateCost(options.provider.model, usage),
       };
     }
     render.onTurnStart(iteration);
@@ -398,7 +462,7 @@ export async function runAgentTurn(
       if (completion.finishReason === "max_tokens") {
         render.onInfo("warning: the model hit its output token limit; consider --max-tokens");
       }
-      return { content: completion.content, toolCalls: totalToolCalls, toolNames, iterations: iteration, usage };
+      return { content: completion.content, toolCalls: totalToolCalls, toolNames, iterations: iteration, usage, costUsd: estimateCost(options.provider.model, usage) };
     }
 
     const calls = completion.toolCalls as ToolCall[];

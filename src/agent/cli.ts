@@ -1,4 +1,5 @@
 import { createInterface } from "node:readline/promises";
+import { spawnSync } from "node:child_process";
 import { readFileSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
@@ -19,7 +20,9 @@ import {
 import { endTurn, quietRender, terminalRender, type AgentRenderEvents } from "./render.js";
 import { resolveProvider, type ChatMessage } from "./providers.js";
 import { envSkillNames, presentSkillNames, presentToolNames, runAgentTurn, type AgentTurnResult } from "./loop.js";
+import { sessionCostUsd } from "./session.js";
 import { checkpointPaths, undoLast } from "./checkpoints.js";
+import { commitAll, isGitRepo, pendingChanges } from "./git.js";
 
 function fail(message: string): never {
   process.stderr.write(`${pc.red("error:")} ${message}\n`);
@@ -61,6 +64,7 @@ interface AgentCliOptions {
   peers?: string;
   plan?: boolean;
   checkpoints?: boolean;
+  delegate?: boolean;
   session?: string;
   continueSession?: boolean;
   confirmShell?: boolean;
@@ -87,6 +91,7 @@ export function registerAgentCommands(program: Command): void {
     .option("--tools <names>", "Comma-separated tool allowlist (default: all tools).")
     .option("--confirm-shell", "Ask before every shell command (interactive terminals only).", false)
     .option("--no-checkpoints", "Disable file checkpoints (undo).")
+    .option("--no-delegate", "Disable the delegate_task subagent tool.", false)
     .option("--plan", "PLAN MODE: read-only tools; the agent produces a plan instead of changes.", false)
     .option("--dir <path>", "Working directory for tools (default: current directory).")
     .option("--skills <names>", "Comma-separated skill names to inline into the system prompt.")
@@ -196,8 +201,10 @@ export function registerAgentCommands(program: Command): void {
       for (const session of sessions) {
         const tokens = sessionTokenCount(session);
         const usage = tokens === undefined ? "" : `\t${tokens} tok`;
+        const cost = sessionCostUsd(session);
+        const costCol = cost === undefined ? "" : `\t$${cost.toFixed(4)}`;
         process.stdout.write(
-          `${session.id}\t${session.provider}/${session.model}\t${session.messages.length} msgs${usage}\t${session.updated_at}\n`,
+          `${session.id}\t${session.provider}/${session.model}\t${session.messages.length} msgs${usage}${costCol}\t${session.updated_at}\n`,
         );
       }
     });
@@ -378,6 +385,7 @@ async function runAgentCommand(
     provider,
     fallbackProvider,
     tools: effectiveAllowlist.length > 0 ? effectiveAllowlist : undefined,
+    allowDelegate: options.delegate !== false,
     confirmShell,
     peers,
     extraTools,
@@ -415,7 +423,7 @@ async function runAgentCommand(
     }
     endTurn();
     render.onInfo(usageLine(turn));
-    addSessionUsage(session, turn.usage);
+    addSessionUsage(session, turn.usage, provider.model);
     session.updated_at = new Date().toISOString().replace(/\.\d+Z$/, "Z");
     saveSession(env.root, session);
     exitFlushed(0);
@@ -424,7 +432,7 @@ async function runAgentCommand(
 
   const rl = createInterface({ input: process.stdin, output: process.stdout });
   process.stderr.write(
-    `${pc.dim("interactive REPL — /exit /sessions /skills /tools /memory /undo /export [file]")}\n`,
+    `${pc.dim("interactive REPL — /exit /sessions /skills /tools /memory /undo /commit /export [file]")}\n`,
   );
 
   try {
@@ -442,8 +450,10 @@ async function runAgentCommand(
         for (const listed of listSessions(env.root)) {
           const tokens = sessionTokenCount(listed);
           const usage = tokens === undefined ? "" : `\t${tokens} tok`;
+          const cost = sessionCostUsd(listed);
+          const costCol = cost === undefined ? "" : `\t$${cost.toFixed(4)}`;
           process.stdout.write(
-            `${listed.id}\t${listed.provider}/${listed.model}\t${listed.messages.length} msgs${usage}\n`,
+            `${listed.id}\t${listed.provider}/${listed.model}\t${listed.messages.length} msgs${usage}${costCol}\n`,
           );
         }
         continue;
@@ -452,6 +462,40 @@ async function runAgentCommand(
         for (const name of envSkillNames(env.root)) {
           process.stdout.write(`${name}\n`);
         }
+        continue;
+      }
+      if (line.startsWith("/commit")) {
+        const argMessage = line.slice("/commit".length).trim();
+        if (!isGitRepo(process.cwd())) {
+          process.stderr.write(`${pc.red("not a git repository: " + process.cwd())}\n`);
+          continue;
+        }
+        const pending = pendingChanges(process.cwd());
+        if (pending.trim().length === 0) {
+          process.stderr.write(`${pc.dim("nothing to commit")}\n`);
+          continue;
+        }
+        let message = argMessage;
+        if (message.length === 0) {
+          // Draft a one-line message from the diff with a quick model call.
+          try {
+            const diff = spawnSync("git", ["diff", "HEAD", "--stat"], { cwd: process.cwd(), encoding: "utf8", maxBuffer: 1_000_000 });
+            const result = await runAgentTurn(
+              { ...agentOptions, allowDelegate: false, tools: ["read_file", "list_dir", "grep", "glob", "memory_read"], maxIterations: 2 },
+              [
+                { role: "user", content: `Write ONE conventional-commit message line (no body) for these staged changes:\n\n${(diff.stdout ?? "").slice(0, 1500)}\n\nAnswer with the message only.` },
+              ],
+              quietRender(),
+            );
+            message = result.content.trim().split("\n")[0] ?? "";
+          } catch (error) {
+            process.stderr.write(`${pc.red(`could not draft a message: ${(error as Error).message.slice(0, 120)}`)}\n`);
+            continue;
+          }
+        }
+        const outcome = commitAll(process.cwd(), message);
+        if (outcome.ok) process.stdout.write(`${pc.green("committed:")} ${message}\n`);
+        else process.stderr.write(`${pc.red(outcome.output)}\n`);
         continue;
       }
       if (line === "/undo") {
@@ -505,7 +549,7 @@ async function runAgentCommand(
       }
       endTurn();
       render.onInfo(usageLine(turn));
-      addSessionUsage(session, turn.usage);
+      addSessionUsage(session, turn.usage, provider.model);
       session.updated_at = new Date().toISOString().replace(/\.\d+Z$/, "Z");
       saveSession(env.root, session);
     }
@@ -516,8 +560,9 @@ async function runAgentCommand(
 
 function usageLine(turn: AgentTurnResult): string {
   const tokens = turn.usage.prompt_tokens + turn.usage.completion_tokens;
+  const cost = turn.costUsd ? ` · $${turn.costUsd.toFixed(4)}` : "";
   if (tokens === 0) return `${turn.iterations} iteration(s) · ${turn.toolCalls} tool call(s)`;
-  return `${turn.iterations} iteration(s) · ${turn.toolCalls} tool call(s) · ${tokens} tokens (in ${turn.usage.prompt_tokens} / out ${turn.usage.completion_tokens})`;
+  return `${turn.iterations} iteration(s) · ${turn.toolCalls} tool call(s) · ${tokens} tokens (in ${turn.usage.prompt_tokens} / out ${turn.usage.completion_tokens})${cost}`;
 }
 
 async function readPipedStdin(): Promise<string | undefined> {
