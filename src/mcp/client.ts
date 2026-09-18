@@ -195,7 +195,7 @@ export function loadMcpConfig(home = defaultHome()): MCPServerSpec[] {
   try {
     data = JSON.parse(readFileSync(file, "utf8"));
   } catch (error) {
-    throw new Error(`MCP config is not valid JSON: ${file} (${(error as Error).message})`);
+    throw new Error(`MCP config is not valid JSON: ${file} (${(error as Error).message})`, { cause: error });
   }
   const servers = data.mcpServers ?? {};
   return Object.entries(servers).map(([name, spec]) => ({
