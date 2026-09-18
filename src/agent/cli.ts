@@ -86,7 +86,7 @@ export function registerAgentCommands(program: Command): void {
     .option("--fallback-model <model>", "Model for the fallback provider.")
     .option("--tools <names>", "Comma-separated tool allowlist (default: all tools).")
     .option("--confirm-shell", "Ask before every shell command (interactive terminals only).", false)
-    .option("--no-checkpoints", "Disable file checkpoints (undo).", false)
+    .option("--no-checkpoints", "Disable file checkpoints (undo).")
     .option("--plan", "PLAN MODE: read-only tools; the agent produces a plan instead of changes.", false)
     .option("--dir <path>", "Working directory for tools (default: current directory).")
     .option("--skills <names>", "Comma-separated skill names to inline into the system prompt.")
