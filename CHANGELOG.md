@@ -10,6 +10,13 @@
   agents message peers via `agent_send`/`agent_inbox` (declared with
   `--peers`), humans via `skillenv mail send/list/read/delete`. Two-agent
   coordination is covered by a deterministic e2e test and live runs.
+- **MCP client**: mount external tool servers over stdio JSON-RPC
+  (`skillenv mcp add/list/remove/test`; Claude Code compatible
+  `~/.skillenv/mcp.json`). Tools appear as `mcp__<server>__<tool>` and merge
+  into the toolbox (allowlist aware). Failing servers are skipped.
+- **Checkpoints & undo**: file mutations are snapshotted before write/edit;
+  REPL `/undo` steps back. `--plan` restricts the agent to read-only tools
+  for planning-only runs.
 - **Pantheon round-table GUI** (`skillenv pantheon`): local web client where
   each god is a fully isolated harness (own environment, provider
   credentials, sessions, memory, mailbox, persona). Round-table mode streams

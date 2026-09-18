@@ -19,6 +19,7 @@ import {
 import { endTurn, quietRender, terminalRender, type AgentRenderEvents } from "./render.js";
 import { resolveProvider, type ChatMessage } from "./providers.js";
 import { envSkillNames, presentSkillNames, presentToolNames, runAgentTurn, type AgentTurnResult } from "./loop.js";
+import { checkpointPaths, undoLast } from "./checkpoints.js";
 
 function fail(message: string): never {
   process.stderr.write(`${pc.red("error:")} ${message}\n`);
@@ -58,6 +59,8 @@ interface AgentCliOptions {
   skills?: string;
   systemExtra?: string;
   peers?: string;
+  plan?: boolean;
+  checkpoints?: boolean;
   session?: string;
   continueSession?: boolean;
   confirmShell?: boolean;
@@ -83,6 +86,8 @@ export function registerAgentCommands(program: Command): void {
     .option("--fallback-model <model>", "Model for the fallback provider.")
     .option("--tools <names>", "Comma-separated tool allowlist (default: all tools).")
     .option("--confirm-shell", "Ask before every shell command (interactive terminals only).", false)
+    .option("--no-checkpoints", "Disable file checkpoints (undo).", false)
+    .option("--plan", "PLAN MODE: read-only tools; the agent produces a plan instead of changes.", false)
     .option("--dir <path>", "Working directory for tools (default: current directory).")
     .option("--skills <names>", "Comma-separated skill names to inline into the system prompt.")
     .option("--system-extra <text>", "Extra instructions appended to the agent system prompt.")
@@ -305,6 +310,26 @@ async function runAgentCommand(
 
   const render: AgentRenderEvents = options.quiet ? quietRender() : terminalRender();
 
+  // MCP: attach configured external tool servers (failures degrade gracefully).
+  let extraTools: import("./tools.js").ToolContext2[] = [];
+  let mcpConnections: import("../mcp/client.js").McpConnection[] = [];
+  {
+    const { loadMcpConfig, attachMcpTools } = await import("../mcp/client.js");
+    const specs = loadMcpConfig(defaultHome());
+    if (specs.length > 0) {
+      const attach = await attachMcpTools(specs);
+      extraTools = attach.tools;
+      mcpConnections = attach.connections;
+      for (const entry of attach.attached) {
+        process.stderr.write(`${pc.dim(`mcp: ${entry.server} attached ${entry.tools} tool(s)`)}\n`);
+      }
+      for (const skip of attach.skipped) {
+        process.stderr.write(`${pc.yellow(`mcp: ${skip.server} skipped — ${skip.error}`)}\n`);
+      }
+      process.on("exit", () => mcpConnections.forEach((connection) => connection.stop()));
+    }
+  }
+
   // Session selection: explicit id > --continue (latest) > fresh.
   let session: AgentSession;
   if (options.session) {
@@ -336,7 +361,17 @@ async function runAgentCommand(
         return { name };
       }
     });
+  const planMode = options.plan === true;
+  if (planMode && toolAllowlist.length > 0) {
+    fail("--plan and --tools are mutually exclusive");
+  }
+  const effectiveAllowlist = planMode ? ["read_file", "list_dir", "glob", "grep", "skill_list", "skill_read", "memory_read"] : toolAllowlist;
+  const planExtra = planMode
+    ? "PLAN MODE: you must not modify anything. Inspect the workspace, then output a step-by-step implementation plan (files to change, approach, risks). The user executes it separately."
+    : undefined;
   const compactChars = Number.parseInt(options.compactChars ?? "120000", 10);
+  const useCheckpoints = options.checkpoints !== false;
+  const checkpointPathsInfo = checkpointPaths(env.root, session.id);
   const agentOptions = {
     envRoot: env.root,
     envName: env.name,
@@ -345,7 +380,10 @@ async function runAgentCommand(
     tools: toolAllowlist.length > 0 ? toolAllowlist : undefined,
     confirmShell,
     peers,
+    extraTools,
     workdir,
+    checkpointDir: useCheckpoints ? checkpointPathsInfo.dir : undefined,
+    checkpointLog: useCheckpoints ? checkpointPathsInfo.log : undefined,
     inlineSkills,
     systemExtra: options.systemExtra,
     maxIterations,
@@ -386,7 +424,7 @@ async function runAgentCommand(
 
   const rl = createInterface({ input: process.stdin, output: process.stdout });
   process.stderr.write(
-    `${pc.dim("interactive REPL — /exit /sessions /skills /tools /memory /export [file]")}\n`,
+    `${pc.dim("interactive REPL — /exit /sessions /skills /tools /memory /undo /export [file]")}\n`,
   );
 
   try {
@@ -414,6 +452,15 @@ async function runAgentCommand(
         for (const name of envSkillNames(env.root)) {
           process.stdout.write(`${name}\n`);
         }
+        continue;
+      }
+      if (line === "/undo") {
+        if (!useCheckpoints) {
+          process.stderr.write(`${pc.dim("checkpoints are disabled (--no-checkpoints)")}\n`);
+          continue;
+        }
+        const restored = undoLast(checkpointPathsInfo.dir, checkpointPathsInfo.log);
+        process.stderr.write(`${pc.dim(restored ?? "(nothing to undo)")}\n`);
         continue;
       }
       if (line === "/memory") {

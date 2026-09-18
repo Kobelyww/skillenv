@@ -125,6 +125,40 @@ immediately, so a crash never loses more than the current turn.
 - Token usage per turn is accumulated from the provider's stream usage chunks
   (providers that support `stream_options.include_usage`).
 
+## MCP integration
+
+Mount external tool servers (Model Context Protocol, stdio transport). The
+config lives at `~/.skillenv/mcp.json` in the Claude Code compatible shape;
+before every agent turn, configured servers are launched, their tools are
+registered as `mcp__<server>__<tool>`, and tool calls are forwarded. A
+failing server is skipped with a warning — degraded capability, never an
+outage.
+
+```bash
+skillenv mcp add fetch -- uvx mcp-server-fetch        # register
+skillenv mcp add calc -e KEY=val -- node calc-server.js
+skillenv mcp list                                      # inspect
+skillenv mcp test fetch                                # handshake + tools/list
+skillenv mcp remove fetch
+```
+
+Mounted tools appear in `--tools` allowlists by their full names
+(`mcp__fetch__fetch`) and are announced to the model automatically.
+
+## Checkpoints and undo
+
+Every `write_file`/`edit_file` snapshots the original file into
+`<env>/checkpoints/<session>/` before mutating it (on by default; disable
+with `--no-checkpoints`). In the REPL, `/undo` steps back through the
+session's mutations — restoring previous contents, or removing files the
+agent created.
+
+## Plan mode
+
+`skillenv agent <env> --plan` restricts the toolbox to read-only tools and
+instructs the agent to produce an implementation plan instead of changes —
+safe exploration of an unfamiliar codebase, executed separately afterwards.
+
 ## Multi-harness communication
 
 Launch several agents and let them coordinate over a file-backed message bus:

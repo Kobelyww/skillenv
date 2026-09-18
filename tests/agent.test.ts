@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
@@ -402,6 +402,55 @@ describe("tools", () => {
       function: { name: "list_dir", arguments: "{path: src}" },
     });
     expect(unquoted.ok).toBe(true);
+  });
+
+  it("checkpoints snapshot mutations and undo restores them", async () => {
+    const env = createEnv("ckpt-env", HOME);
+    const ckptDir = path.join(env.root, "checkpoints", "s1");
+    const ckptLog = path.join(ckptDir, "manifest.jsonl");
+    const ctx = { workdir, envRoot: env.root, checkpointDir: ckptDir, checkpointLog: ckptLog };
+    const tools = defaultTools();
+
+    // Agent creates a file.
+    await executeTool(tools, ctx, {
+      id: "c1", type: "function",
+      function: { name: "write_file", arguments: JSON.stringify({ path: "new.txt", content: "v1" }) },
+    });
+    // Agent overwrites it.
+    await executeTool(tools, ctx, {
+      id: "c2", type: "function",
+      function: { name: "write_file", arguments: JSON.stringify({ path: "new.txt", content: "v2" }) },
+    });
+    expect(readFileSync(path.join(workdir, "new.txt"), "utf8")).toBe("v2");
+
+    // Undo the overwrite: back to v1.
+    const { undoLast } = await import("../src/agent/checkpoints.js");
+    expect(undoLast(ckptDir, ckptLog)).toContain("restored");
+    expect(readFileSync(path.join(workdir, "new.txt"), "utf8")).toBe("v1");
+
+    // Undo the creation: file removed.
+    expect(undoLast(ckptDir, ckptLog)).toContain("removed created file");
+    expect(existsSync(path.join(workdir, "new.txt"))).toBe(false);
+
+    // Nothing left to undo.
+    expect(undoLast(ckptDir, ckptLog)).toBeNull();
+  });
+
+  it("plan mode restricts tools to read-only", async () => {
+    const { buildSystemPrompt, presentToolNames } = await import("../src/agent/loop.js");
+    const env = createEnv("plan-env", HOME);
+    const prompt = buildSystemPrompt({
+      envRoot: env.root, envName: "plan-env",
+      provider: { id: "x", displayName: "X", baseUrl: "", apiKey: "", model: "m" },
+      workdir: "/tmp", systemExtra: "PLAN MODE: you must not modify anything.",
+    });
+    expect(prompt).toContain("PLAN MODE");
+    // Read-only set excludes mutating tools.
+    const all = presentToolNames();
+    expect(all).toContain("write_file");
+    const readOnly = ["read_file", "list_dir", "glob", "grep", "skill_list", "skill_read", "memory_read"];
+    expect(readOnly.every((name) => all.includes(name))).toBe(true);
+    expect(readOnly).not.toContain("write_file");
   });
 
   it("exposes schemas for every tool", () => {

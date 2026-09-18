@@ -6,6 +6,7 @@ import pc from "picocolors";
 import { ADAPTERS, getAdapter, type AdapterSpec } from "./adapter.js";
 import { deleteMail, listMail, pruneMail, readMail, sendMail } from "./agent/mailbox.js";
 import { syncMailboxes } from "./mail-sync.js";
+import { loadMcpConfig, saveMcpConfig } from "./mcp/client.js";
 import { defaultHome } from "./config.js";
 import {
   cloneEnv,
@@ -581,6 +582,77 @@ program
       process.on("SIGINT", shutdown);
       process.on("SIGTERM", shutdown);
     } catch (error) {
+      fail((error as Error).message);
+    }
+  });
+
+const mcpApp = program.command("mcp").description("Manage MCP (Model Context Protocol) tool servers mounted into the agent.");
+
+mcpApp
+  .command("add <name> <command> [args...]")
+  .description("Register an MCP stdio server (Claude Code compatible ~/.skillenv/mcp.json).")
+  .option("-e, --env <pair>", "Environment variable for the server, KEY=VALUE (repeatable).", (v: string, prev: string[]) => [...prev, v], [])
+  .action((name: string, command: string, args: string[], options: { env: string[] }) => {
+    try {
+      if (name.includes("/") || name.includes("..")) fail(`invalid server name: ${name}`);
+      const env: Record<string, string> = {};
+      for (const pair of options.env) {
+        const eq = pair.indexOf("=");
+        if (eq === -1) fail(`--env expects KEY=VALUE, got: ${pair}`);
+        env[pair.slice(0, eq)] = pair.slice(eq + 1);
+      }
+      const specs = loadMcpConfig(defaultHome()).filter((spec) => spec.name !== name);
+      specs.push({ name, command, args, env });
+      saveMcpConfig(specs, defaultHome());
+      process.stdout.write(`added ${name}: ${command} ${args.join(" ")}\n`);
+    } catch (error) {
+      fail((error as Error).message);
+    }
+  });
+
+mcpApp
+  .command("list")
+  .description("List configured MCP servers.")
+  .action(() => {
+    const specs = loadMcpConfig(defaultHome());
+    if (specs.length === 0) {
+      process.stdout.write("no MCP servers configured\n");
+      return;
+    }
+    for (const spec of specs) {
+      process.stdout.write(`${spec.name}\t${spec.command} ${(spec.args ?? []).join(" ")}\n`);
+    }
+  });
+
+mcpApp
+  .command("remove <name>")
+  .description("Remove an MCP server from the config.")
+  .action((name: string) => {
+    const specs = loadMcpConfig(defaultHome());
+    const remaining = specs.filter((spec) => spec.name !== name);
+    if (remaining.length === specs.length) fail(`MCP server not found: ${name}`);
+    saveMcpConfig(remaining, defaultHome());
+    process.stdout.write(`removed ${name}\n`);
+  });
+
+mcpApp
+  .command("test <name>")
+  .description("Launch an MCP server, list its tools, and exit.")
+  .action(async (name: string) => {
+    const spec = loadMcpConfig(defaultHome()).find((candidate) => candidate.name === name);
+    if (!spec) fail(`MCP server not found: ${name}`);
+    const { McpConnection } = await import("./mcp/client.js");
+    const connection = new McpConnection(spec);
+    try {
+      await connection.start();
+      const tools = await connection.listTools();
+      process.stdout.write(`OK ${name} (${connection.serverInfo.name ?? "?"}): ${tools.length} tool(s)\n`);
+      for (const tool of tools) {
+        process.stdout.write(`  mcp__${name}__${tool.name}\t${tool.description ?? ""}\n`);
+      }
+      connection.stop();
+    } catch (error) {
+      connection.stop();
       fail((error as Error).message);
     }
   });

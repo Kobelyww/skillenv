@@ -97,6 +97,8 @@ self-contained agent home**:
 | **Built-in coding agent** | `skillenv agent` — a streaming tool-calling agent over any OpenAI-compatible provider (DeepSeek, Nous Hermes, GLM, OpenAI, Ollama, ModelArts MaaS) with 10 workspace tools and skill injection |
 | **Persistent memory** | `memory_read`/`memory_write` tools keep durable facts, decisions, and preferences per environment — the working agent starts every session with its accumulated context |
 | **Multi-harness bus** | `--peers` + `agent_send`/`agent_inbox`: several agent harnesses coordinate over a file-backed mailbox (humans join with `skillenv mail`) |
+| **MCP integration** | stdio MCP client: mount external tool servers (`skillenv mcp add/list/test`, Claude Code compatible config); failing servers degrade gracefully |
+| **Checkpoints & undo** | every file mutation is snapshotted; `/undo` steps back. `--plan` mode restricts the agent to read-only planning |
 | **Pantheon round table** | `skillenv pantheon`: a local web GUI where every god is a **fully isolated harness** (own env, provider, sessions, memory, mailbox, persona). Your prompt goes to all gods in parallel, they debate each other's answers, and the chair synthesizes — or chat with one god privately |
 | **Reproducibility** | `export` emits a manifest from the lock; `create -f` recreates the environment elsewhere; `doctor` verifies layout and checksums |
 

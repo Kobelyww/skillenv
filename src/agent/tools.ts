@@ -6,6 +6,7 @@ import path from "node:path";
 import { jsonrepair } from "jsonrepair";
 import { readSkillMeta, SKILL_FILE } from "../skill.js";
 import { listMail, markMailRead, sendMail } from "./mailbox.js";
+import { snapshotBefore } from "./checkpoints.js";
 
 export interface ToolContext {
   /** Working directory for relative paths and shell commands. */
@@ -23,6 +24,9 @@ export interface ToolContext {
   confirmShell?: (command: string) => Promise<boolean>;
   /** Peer harnesses available for agent_send/agent_inbox. envRoot present = same machine (direct write); absent = remote peer (message lands in own outbox for mail sync). */
   peers?: { name: string; envRoot?: string }[];
+  /** Checkpoints: snapshot files before mutation (dir + manifest log). */
+  checkpointDir?: string;
+  checkpointLog?: string;
 }
 
 export interface ToolResult {
@@ -99,6 +103,9 @@ const writeFileTool: ToolContext2 = {
       return { ok: false, output: "content must be a string" };
     }
     try {
+      if (context.checkpointDir && context.checkpointLog) {
+        snapshotBefore(context.checkpointDir, context.checkpointLog, file, "write_file");
+      }
       mkdirSync(path.dirname(file), { recursive: true });
       writeFileSync(file, args.content, "utf8");
       return { ok: true, output: `wrote ${file} (${args.content.length} bytes)` };
@@ -139,6 +146,9 @@ const editFileTool: ToolContext2 = {
       }
       // Function form: replacement strings containing $&, $1, … must be
       // inserted literally, not expanded as replace patterns.
+      if (context.checkpointDir && context.checkpointLog) {
+        snapshotBefore(context.checkpointDir, context.checkpointLog, file, "edit_file");
+      }
       writeFileSync(file, text.replace(oldString, () => newString), "utf8");
       return { ok: true, output: `edited ${file}` };
     } catch (error) {

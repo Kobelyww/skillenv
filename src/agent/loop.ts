@@ -18,10 +18,15 @@ export interface AgentOptions {
   envRoot: string;
   envName: string;
   provider: ResolvedProvider;
+  /** Checkpoints: snapshot files under this dir before write/edit mutations. */
+  checkpointDir?: string;
+  checkpointLog?: string;
   /** Failover target when the primary provider fails before any output. */
   fallbackProvider?: ResolvedProvider;
   /** Restrict the toolbox; default is all tools. Unknown names are ignored. */
   tools?: string[];
+  /** Additional tools (e.g. MCP proxies) merged into the toolbox. */
+  extraTools?: import("./tools.js").ToolContext2[];
   /** Ask before every shell command (see ToolContext.confirmShell). */
   confirmShell?: (command: string) => Promise<boolean>;
   /** Peer harnesses this agent can message via agent_send. envRoot absent = remote peer (mail sync). */
@@ -223,7 +228,7 @@ export async function runAgentTurn(
   messages: ChatMessage[],
   render: AgentRenderEvents,
 ): Promise<AgentTurnResult> {
-  const allTools = defaultTools();
+  const allTools = [...defaultTools(), ...(options.extraTools ?? [])];
   const tools = options.tools ? allTools.filter((tool) => options.tools?.includes(tool.name)) : allTools;
   const schemas = toolSchemas(tools);
   const context: ToolContext = {
@@ -232,6 +237,8 @@ export async function runAgentTurn(
     envName: options.envName,
     confirmShell: options.confirmShell,
     peers: options.peers,
+    checkpointDir: options.checkpointDir,
+    checkpointLog: options.checkpointLog,
   };
   const maxIterations = options.maxIterations ?? 25;
 
