@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import path from "node:path";
 import process from "node:process";
 import { Command } from "commander";
 import pc from "picocolors";
@@ -15,6 +16,7 @@ import {
   renameEnv,
 } from "./env.js";
 import { readFileSync } from "node:fs";
+import { spawn } from "node:child_process";
 import { checkEnv, describeEnv, diffEnvs, providerReadiness } from "./inspect.js";
 import { installSpecs } from "./installer.js";
 import { exportManifest, loadManifestFile, readManifest, writeManifest } from "./manifest.js";
@@ -38,6 +40,7 @@ import {
 } from "./scaffolds.js";
 import { VERSION } from "./version.js";
 import { registerAgentCommands } from "./agent/cli.js";
+import { resolveProvider } from "./agent/providers.js";
 
 function fail(message: string): never {
   process.stderr.write(`${pc.red("error:")} ${message}\n`);
@@ -520,6 +523,68 @@ pluginApp
 
 // Built-in coding agent (provider-agnostic OpenAI-compatible harness).
 registerAgentCommands(program);
+
+program
+  .command("pantheon")
+  .description("Launch the Pantheon round-table GUI — one fully isolated agent harness per god.")
+  .option("-g, --god <env...>", "Environment names as gods (repeatable; missing default gods are auto-created).")
+  .option("--persona <pair...>", "Persona override god=text (repeatable).")
+  .option("-p, --provider <id>", "Shared provider for gods without their own env override.")
+  .option("-m, --model <model>", "Shared model.")
+  .option("--base-url <url>", "Shared provider base URL.")
+  .option("--api-key <key>", "Shared API key.")
+  .option("--port <n>", "Port to listen on.", "4620")
+  .option("--dir <path>", "Working directory for gods' tools (default: current directory).")
+  .option("--no-open", "Do not open the browser automatically.")
+  .action(async (options: {
+    god?: string[]; persona?: string[]; provider?: string; model?: string;
+    baseUrl?: string; apiKey?: string; port?: string; dir?: string; open?: boolean;
+  }) => {
+    const { listenPantheon, resolveGods, ensureGodEnv } = await import("./ui/pantheon.js");
+    const { renderPage } = await import("./ui/page.js");
+    try {
+      const shared = resolveProvider({
+        provider: options.provider,
+        model: options.model,
+        baseUrl: options.baseUrl,
+        apiKey: options.apiKey,
+      });
+      const personas: Record<string, string> = {};
+      for (const pair of options.persona ?? []) {
+        const eq = pair.indexOf("=");
+        if (eq === -1) fail(`--persona expects god=text, got: ${pair}`);
+        personas[pair.slice(0, eq)] = pair.slice(eq + 1);
+      }
+      const requested = options.god ?? [];
+      // Pre-create explicitly requested gods so resolveGods sees them as intentional.
+      for (const name of requested) ensureGodEnv(name, defaultHome());
+      const gods = resolveGods(requested, shared, personas, defaultHome());
+      const port = Math.max(1, Number.parseInt(options.port ?? "4620", 10) || 4620);
+      const workdir = path.resolve(options.dir ?? process.cwd());
+      const { server, url } = await listenPantheon({ gods, workdir }, port);
+      const roster = gods.map((god) => god.name).join(", ");
+      process.stdout.write(
+        `PANTHEON convened: ${roster}\n${url}  (provider=${shared.id}/${shared.model}, dir=${workdir})\nCtrl-C to adjourn.\n`,
+      );
+      if (options.open !== false) {
+        const opener = process.platform === "darwin" ? "open" : process.platform === "win32" ? "cmd" : "xdg-open";
+        const openerArgs = process.platform === "win32" ? ["/c", "start", "", url] : [url];
+        try {
+          spawn(opener, openerArgs, { stdio: "ignore", detached: true }).unref();
+        } catch {
+          // best effort only
+        }
+      }
+      const shutdown = (): void => {
+        server.close();
+        process.exit(0);
+      };
+      process.on("SIGINT", shutdown);
+      process.on("SIGTERM", shutdown);
+    } catch (error) {
+      fail((error as Error).message);
+    }
+  });
 
 const mailApp = program.command("mail").description("Read and send cross-environment mailbox messages (the agent bus humans can use too).");
 

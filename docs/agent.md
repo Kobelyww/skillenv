@@ -211,3 +211,29 @@ the loop itself is additionally covered by mock-provider e2e tests.
 The full loop is covered by tests against a local mock server
 (`tests/agent-e2e.test.ts`), so agent behavior is regression-tested in CI
 without any API keys.
+
+## Pantheon — the round-table GUI
+
+`skillenv pantheon` starts a local web client (`http://127.0.0.1:4620`)
+where every god is a **fully isolated harness**: its own skillenv
+environment (skills, sessions, memory, mailbox), its own provider
+credentials, and its own persona. The server only orchestrates — harnesses
+share nothing except answers deliberately passed between them.
+
+```bash
+skillenv pantheon                                    # hermes/athena/hephaestus auto-provisioned
+skillenv pantheon -g hermes -g poseidon -p nous      # custom roster, Hermes models
+skillenv pantheon --persona "hermes=You are..." -p deepseek
+```
+
+Modes:
+
+- **圆桌 (round table)**: your prompt streams to every god in parallel;
+  each god answers with its own tools and memory; in debate rounds every
+  god sees the others' answers and responds; the chair (first god)
+  synthesizes a final recommendation.
+- **单神 (solo)**: a private audience with one god — same isolation.
+
+Per-god provider isolation: set `SKILLENV_GOD_HERMES_PROVIDER=nous`,
+`SKILLENV_GOD_HERMES_MODEL=Hermes-4-405B`, `SKILLENV_GOD_ATHENA_*`, … and
+each god runs on different credentials/models while sharing nothing.

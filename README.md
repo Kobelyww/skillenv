@@ -97,6 +97,7 @@ self-contained agent home**:
 | **Built-in coding agent** | `skillenv agent` — a streaming tool-calling agent over any OpenAI-compatible provider (DeepSeek, Nous Hermes, GLM, OpenAI, Ollama, ModelArts MaaS) with 10 workspace tools and skill injection |
 | **Persistent memory** | `memory_read`/`memory_write` tools keep durable facts, decisions, and preferences per environment — the working agent starts every session with its accumulated context |
 | **Multi-harness bus** | `--peers` + `agent_send`/`agent_inbox`: several agent harnesses coordinate over a file-backed mailbox (humans join with `skillenv mail`) |
+| **Pantheon round table** | `skillenv pantheon`: a local web GUI where every god is a **fully isolated harness** (own env, provider, sessions, memory, mailbox, persona). Your prompt goes to all gods in parallel, they debate each other's answers, and the chair synthesizes — or chat with one god privately |
 | **Reproducibility** | `export` emits a manifest from the lock; `create -f` recreates the environment elsewhere; `doctor` verifies layout and checksums |
 
 ## Quick start
@@ -297,6 +298,7 @@ version (not simulated):
 - [Lockfile spec](docs/lockfile-spec.md) — `lock.json` format and checksums
 - [Publishing](docs/publishing.md) — release and registry workflow
 - [Development log](docs/development-log.md) — how the v2 rewrite was built and verified
+- [Pantheon](docs/pantheon.md) — the round-table multi-harness GUI
 
 ## Development
 

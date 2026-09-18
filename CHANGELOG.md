@@ -10,6 +10,14 @@
   agents message peers via `agent_send`/`agent_inbox` (declared with
   `--peers`), humans via `skillenv mail send/list/read/delete`. Two-agent
   coordination is covered by a deterministic e2e test and live runs.
+- **Pantheon round-table GUI** (`skillenv pantheon`): local web client where
+  each god is a fully isolated harness (own environment, provider
+  credentials, sessions, memory, mailbox, persona). Round-table mode streams
+  all gods' answers in parallel, runs optional debate rounds where every god
+  sees the others' answers, and the chair synthesizes a conclusion; solo
+  mode chats with one god. Zero-config: missing default gods are
+  auto-provisioned; per-god provider overrides via
+  `SKILLENV_GOD_<NAME>_*` env vars.
 - **Cross-machine mail sync**: `skillenv mail sync <git-url>` two-way
   syncs every environment's mailbox over a plain git remote (outbox model —
   messages addressed to remote peers are exported exactly once; imports land
