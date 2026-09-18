@@ -1,5 +1,4 @@
 import { spawnSync } from "node:child_process";
-import path from "node:path";
 
 /** Git integration used by the agent REPL (/commit). Never pushes. */
 
